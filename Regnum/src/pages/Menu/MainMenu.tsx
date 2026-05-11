@@ -9,6 +9,7 @@ import {
   Coins,
   Wine
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 import SettingsModal from '../../components/Modal/SettingsModal';
 import GameControls from '../../components/UI/GameControls';
@@ -29,6 +30,7 @@ const CornerDecoration = () => (
 
 const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const navigate = useNavigate();
 
   const menuItems = [
     { id: 'new-game', text: 'Nueva Partida', icon: <Sword size={20} />, primary: true },
@@ -41,6 +43,9 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
   const handleAction = (id: string) => {
     if (id === 'settings') {
       setIsSettingsOpen(true);
+    }
+    if (id === 'gallery') {
+      navigate('/gallery');
     }
     if (id === 'exit') {
       window.location.reload();

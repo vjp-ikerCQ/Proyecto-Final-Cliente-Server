@@ -18,6 +18,8 @@ function InitialRedirect() {
   return null;
 }
 
+import CardGallery from './pages/Menu/CardGallery';
+
 function App() {
   const [user, setUser] = useState<{ name: string; isGuest: boolean } | null>(null);
 
@@ -42,6 +44,14 @@ function App() {
             path="/menu" 
             element={
               user ? <MainMenu user={user} /> : <Navigate to="/" />
+            } 
+          />
+
+          {/* Gallery Route */}
+          <Route 
+            path="/gallery" 
+            element={
+              user ? <CardGallery /> : <Navigate to="/" />
             } 
           />
 
