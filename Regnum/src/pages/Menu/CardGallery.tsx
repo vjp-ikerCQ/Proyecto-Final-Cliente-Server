@@ -4,6 +4,9 @@ import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { allCards } from '../../utils/cardData';
 
+/**
+ * Colores representativos para cada palo de la baraja
+ */
 const suitColors = {
   espadas: '#ff4d4d',
   copas: '#00ccff',
@@ -11,6 +14,10 @@ const suitColors = {
   bastos: '#00ff66',
 };
 
+/**
+ * Componente de la Galería de Cartas.
+ * Permite visualizar y filtrar las 48 cartas de la baraja española.
+ */
 const CardGallery: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'TODAS' | 'ESPADAS' | 'COPAS' | 'OROS' | 'BASTOS'>('TODAS');
@@ -21,10 +28,10 @@ const CardGallery: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#050505] text-white p-8 font-cinzel relative overflow-y-auto">
-      {/* Background decoration */}
+      {/* Decoración de fondo fija para mantener la atmósfera */}
       <div className="fixed top-0 left-0 w-full h-full bg-menu-pattern opacity-10 pointer-events-none" />
       
-      {/* Header */}
+      {/* Cabecera de la Galería */}
       <header className="relative z-10 flex flex-col items-center mb-16">
         <button 
           onClick={() => navigate('/menu')}
@@ -46,7 +53,7 @@ const CardGallery: React.FC = () => {
         </div>
       </header>
 
-      {/* Tabs */}
+      {/* Navegación por pestañas (Filtros por palo) */}
       <nav className="relative z-10 flex justify-center gap-2 mb-16 flex-wrap">
         {['TODAS', 'ESPADAS', 'COPAS', 'OROS', 'BASTOS'].map((tab) => (
           <button
@@ -71,7 +78,7 @@ const CardGallery: React.FC = () => {
         ))}
       </nav>
 
-      {/* Grid */}
+      {/* Cuadrícula de Cartas */}
       <main className="relative z-10 max-w-7xl mx-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
         <AnimatePresence mode='popLayout'>
           {filteredCards.map((card) => (
@@ -84,7 +91,7 @@ const CardGallery: React.FC = () => {
               transition={{ duration: 0.4, ease: "easeOut" }}
               className="group relative aspect-[2/3] cursor-pointer"
             >
-              {/* Main Card Container */}
+              {/* Contenedor principal de la carta */}
               <div 
                 className="w-full h-full relative rounded-lg overflow-hidden border bg-[#080808] transition-all duration-500 group-hover:shadow-[0_0_40px_rgba(0,0,0,0.9)] group-hover:-translate-y-2"
                 style={{ 
@@ -92,7 +99,7 @@ const CardGallery: React.FC = () => {
                   boxShadow: `0 0 20px ${suitColors[card.suit]}11`
                 }}
               >
-                {/* Internal suit glow on hover */}
+                {/* Resplandor interno del color del palo al pasar el ratón */}
                 <div 
                     className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none z-10"
                     style={{ 
@@ -100,7 +107,7 @@ const CardGallery: React.FC = () => {
                         boxShadow: `inset 0 0 30px ${suitColors[card.suit]}22`
                     }}
                 />
-                {/* Full Card Image Placeholder */}
+                {/* Marcador de posición para la imagen completa de la carta */}
                 <div className="absolute inset-0 w-full h-full bg-[#111] overflow-hidden">
                   {card.image ? (
                     <img 
@@ -114,7 +121,7 @@ const CardGallery: React.FC = () => {
                     />
                   ) : null}
                   
-                  {/* Subtle placeholder content if no image */}
+                  {/* Contenido sutil de marcador si no hay imagen disponible */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center opacity-40 group-hover:opacity-100 transition-opacity duration-500">
                     <div className="w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent mb-4" />
                     <span className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-cinzel">
@@ -124,7 +131,7 @@ const CardGallery: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Top Left: Cost Bubble */}
+                {/* Arriba Izquierda: Burbuja de Coste de Voluntad */}
                 <div className="absolute top-2 left-2 z-20">
                   <div 
                     className="w-10 h-10 rounded-full bg-black/90 backdrop-blur-md flex items-center justify-center border-2 shadow-2xl transition-all duration-300 group-hover:scale-110"
@@ -136,7 +143,7 @@ const CardGallery: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Top Right: Rank Number */}
+                {/* Arriba Derecha: Número de Rango de la carta */}
                 <div className="absolute top-2 right-2 z-20">
                   <div 
                     className="px-2 py-1 rounded-sm bg-black/60 backdrop-blur-sm border border-white/10 text-[10px] font-bold text-gray-400 group-hover:text-white transition-colors"
@@ -145,7 +152,7 @@ const CardGallery: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Hover Info Overlay (Subtle) */}
+                {/* Capa de información al pasar el ratón (Detalles de la carta) */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-5">
                     <div className="mb-2">
                         <p className="text-[11px] text-primary-gold uppercase tracking-widest font-bold mb-1">
