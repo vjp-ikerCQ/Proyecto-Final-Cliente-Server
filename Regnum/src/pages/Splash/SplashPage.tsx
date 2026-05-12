@@ -1,13 +1,17 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { audioService } from '../../services/AudioService';
+
 
 const SplashPage: React.FC = () => {
   const navigate = useNavigate();
 
   const handleStart = () => {
+    audioService.playMusic();
     navigate('/login');
   };
+
 
   return (
     <motion.div 

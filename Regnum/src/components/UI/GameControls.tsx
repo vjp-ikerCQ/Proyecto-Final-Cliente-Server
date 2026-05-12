@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Volume2, VolumeX, Sun, Moon } from 'lucide-react';
+import { audioService } from '../../services/AudioService';
 
 /**
  * Componente que gestiona los controles globales del juego (Sonido y Tema).
  * Utiliza localStorage para persistir las preferencias del usuario.
  */
 const GameControls: React.FC = () => {
-  // Inicializa el estado de la música desde localStorage o por defecto activado
-  const [isMusicOn, setIsMusicOn] = useState(() => {
-    const saved = localStorage.getItem('music-on');
-    return saved !== null ? JSON.parse(saved) : true;
-  });
+  // Inicializa el estado de la música desde el servicio
+  const [isMusicOn, setIsMusicOn] = useState(audioService.isEnabled());
+
 
   // Inicializa el modo oscuro desde localStorage o por defecto activado
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -33,17 +32,22 @@ const GameControls: React.FC = () => {
   }, [isDarkMode]);
 
   /**
-   * Efecto para guardar la preferencia de música en localStorage.
+   * Efecto para guardar la preferencia de música y actualizar el servicio.
    */
   useEffect(() => {
-    localStorage.setItem('music-on', JSON.stringify(isMusicOn));
+    audioService.setMusicEnabled(isMusicOn);
   }, [isMusicOn]);
+
+  const toggleMusic = () => {
+    setIsMusicOn(!isMusicOn);
+  };
 
   return (
     <div className="absolute top-8 right-8 flex gap-4 z-10 animate-fade-in-down">
       {/* Botón de Control de Música */}
       <button 
-        onClick={() => setIsMusicOn(!isMusicOn)}
+        onClick={toggleMusic}
+
         className="p-3 border border-accent-gray bg-panel/50 text-primary-gold hover:bg-primary-gold hover:text-bg-main transition-all duration-300 rounded-sm group shadow-[0_0_15px_rgba(0,0,0,0.5)]"
         title="Alternar Música"
       >
