@@ -41,10 +41,10 @@ const SplashPage: React.FC = () => {
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 2, delay: 0.5 }}
         >
-          <h1 className="text-7xl md:text-9xl font-cinzel-decorative text-gold-gradient drop-shadow-[0_0_30px_rgba(166,138,100,0.5)] mb-2">
+          <h1 className="text-4xl sm:text-6xl md:text-9xl font-cinzel-decorative text-gold-gradient drop-shadow-[0_0_30px_rgba(166,138,100,0.5)] mb-2 px-4">
             Regnum Hollow
           </h1>
-          <p className="font-cinzel text-lg md:text-2xl tracking-[0.6em] text-primary-gold/60 uppercase">
+          <p className="font-cinzel text-xs sm:text-lg md:text-2xl tracking-[0.3em] sm:tracking-[0.6em] text-primary-gold/60 uppercase">
             In Manus Fatum
           </p>
         </motion.div>

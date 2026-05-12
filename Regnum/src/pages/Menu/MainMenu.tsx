@@ -64,6 +64,9 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
   const handleAction = (id: string) => {
     console.log('Menú - Acción pulsada:', id);
     switch (id) {
+      case 'new-game':
+        navigate('/game');
+        break;
       case 'settings':
         setIsSettingsOpen(true);
         break;
@@ -83,7 +86,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
   };
 
   return (
-    <div className="relative flex flex-col items-center justify-center min-h-screen p-8 overflow-hidden bg-menu-pattern transition-all duration-500">
+    <div className="relative flex flex-col items-center justify-between h-screen p-4 md:p-8 overflow-hidden bg-menu-pattern transition-all duration-500">
 
       {/* Partículas de fuego ambientales */}
       <FireParticles />
@@ -92,55 +95,50 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
       <GameControls />
 
       {/* Botón de Estadísticas (Superior Izquierda) */}
-      <div className="absolute top-8 left-8 z-10 animate-fade-in-down">
+      <div className="absolute top-4 left-4 md:top-8 md:left-8 z-20 animate-fade-in-down">
         <button
           onClick={() => setIsStatsOpen(true)}
-          className="p-3 border border-accent-gray bg-panel/50 text-primary-gold hover:bg-primary-gold hover:text-bg-main transition-all duration-300 rounded-sm flex items-center gap-2 group shadow-[0_0_15px_rgba(0,0,0,0.5)]"
+          className="p-2 md:p-3 border border-accent-gray bg-panel/50 text-primary-gold hover:bg-primary-gold hover:text-bg-main transition-all duration-300 rounded-sm flex items-center gap-2 group shadow-[0_0_15px_rgba(0,0,0,0.5)]"
           title="Ver Estadísticas"
         >
-          <BarChart2 size={20} className="group-hover:scale-110 transition-transform" />
-          <span className="text-xs uppercase tracking-widest font-cinzel hidden md:block">Estadísticas</span>
+          <BarChart2 size={16} className="group-hover:scale-110 transition-transform md:w-5 md:h-5" />
+          <span className="text-[10px] md:text-xs uppercase tracking-widest font-cinzel hidden lg:block">Estadísticas</span>
         </button>
       </div>
 
       {/* Cabecera con el título del juego */}
-      <header className="mb-12 text-center animate-fade-in-down relative z-10">
-        <h1 className="mb-2 text-5xl font-black tracking-widest uppercase md:text-7xl font-cinzel-decorative text-gold-gradient drop-shadow-[0_0_20px_rgba(166,138,100,0.5)]">
+      <header className="mt-4 md:mt-0 text-center animate-fade-in-down relative z-10 px-4 shrink-0">
+        <h1 className="mb-1 text-3xl sm:text-5xl md:text-7xl font-black tracking-widest uppercase font-cinzel-decorative text-gold-gradient drop-shadow-[0_0_20px_rgba(166,138,100,0.5)]">
           Regnum Hollow
         </h1>
-        <div className="flex items-center justify-center gap-6">
-          <div className="h-px w-20 bg-gradient-to-r from-transparent via-accent-gray to-transparent" />
-          <span className="text-sm tracking-widest uppercase font-cinzel text-gray-400">
+        <div className="flex items-center justify-center gap-2 md:gap-6">
+          <div className="h-px w-6 md:w-20 bg-gradient-to-r from-transparent via-accent-gray to-transparent" />
+          <span className="text-[8px] md:text-sm tracking-widest uppercase font-cinzel text-gray-400">
             Bienvenido, {user.name}
           </span>
-          <div className="h-px w-20 bg-gradient-to-r from-transparent via-accent-gray to-transparent" />
+          <div className="h-px w-6 md:w-20 bg-gradient-to-r from-transparent via-accent-gray to-transparent" />
         </div>
       </header>
 
       {/* Contenedor de botones principales */}
-      <main className="flex flex-col gap-6 w-full max-w-[400px] animate-fade-in-up [animation-delay:300ms] relative z-10">
+      <main className="flex flex-col gap-2 md:gap-4 w-full max-w-[260px] sm:max-w-[400px] animate-fade-in-up [animation-delay:300ms] relative z-10 px-2 shrink">
         {menuItems.map((item) => (
           <button
             key={item.id}
             onClick={() => handleAction(item.id)}
             className={`
-              relative flex flex-col items-center justify-center gap-2 p-6 transition-all duration-300 group overflow-hidden
+              relative flex flex-col items-center justify-center gap-0.5 md:gap-2 p-2.5 md:p-5 transition-all duration-300 group overflow-hidden shrink-0
               ${item.primary
-                ? 'bg-primary-gold text-bg-main border-primary-gold font-extrabold shadow-[0_0_25px_rgba(166,138,100,0.4)] hover:scale-[1.03] hover:bg-[#c4a47a] hover:shadow-[0_0_40px_rgba(166,138,100,0.6)]'
-                : 'bg-panel/40 text-text-main/70 border border-accent-gray hover:bg-panel/80 hover:border-primary-gold hover:text-text-main hover:-translate-y-1 hover:shadow-[0_0_20px_rgba(166,138,100,0.15)]'
+                ? 'bg-primary-gold text-bg-main border-primary-gold font-extrabold shadow-[0_0_20px_rgba(166,138,100,0.3)] active:scale-95'
+                : 'bg-panel/40 text-text-main/70 border border-accent-gray hover:bg-panel/80 hover:border-primary-gold hover:text-text-main active:scale-95'
               }
             `}
           >
-            {/* Ornamentos de esquina */}
             <CornerDecoration />
-
-            {/* Brillo animado al pasar el ratón */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] pointer-events-none" />
-
-            <div className={`${item.primary ? 'text-bg-main drop-shadow-sm' : 'text-primary-gold group-hover:text-white transition-colors'}`}>
-              {item.icon}
+            <div className={`${item.primary ? 'text-bg-main' : 'text-primary-gold group-hover:text-white'} transition-colors`}>
+              {React.cloneElement(item.icon as React.ReactElement, { size: 14 })}
             </div>
-            <span className="text-base tracking-[0.2em] uppercase font-cinzel">
+            <span className="text-[10px] md:text-base tracking-[0.2em] uppercase font-cinzel">
               {item.text}
             </span>
           </button>
@@ -148,14 +146,14 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
       </main>
 
       {/* Pie de página con iconos de palos */}
-      <footer className="mt-16 text-center animate-fade-in-up [animation-delay:600ms] relative z-10">
-        <div className="flex justify-center gap-5 mb-8">
-          <Sword className="text-[#ff4d4d] opacity-60 hover:opacity-100 transition-opacity drop-shadow-[0_0_8px_rgba(255,77,77,0.5)]" size={18} />
-          <Pen className="text-[#00ff66] opacity-60 hover:opacity-100 transition-opacity drop-shadow-[0_0_8px_rgba(0,255,102,0.5)]" size={18} />
-          <Coins className="text-[#ffcc00] opacity-60 hover:opacity-100 transition-opacity drop-shadow-[0_0_8px_rgba(255,204,0,0.5)]" size={18} />
-          <Wine className="text-[#00ccff] opacity-60 hover:opacity-100 transition-opacity drop-shadow-[0_0_8px_rgba(0,204,255,0.5)]" size={18} />
+      <footer className="mb-4 md:mb-0 text-center animate-fade-in-up [animation-delay:600ms] relative z-10 shrink-0">
+        <div className="flex justify-center gap-4 md:gap-5 mb-2 md:mb-6">
+          <Sword className="text-[#ff4d4d] opacity-60 w-3.5 h-3.5 md:w-5 md:h-5" />
+          <Pen className="text-[#00ff66] opacity-60 w-3.5 h-3.5 md:w-5 md:h-5" />
+          <Coins className="text-[#ffcc00] opacity-60 w-3.5 h-3.5 md:w-5 md:h-5" />
+          <Wine className="text-[#00ccff] opacity-60 w-3.5 h-3.5 md:w-5 md:h-5" />
         </div>
-        <p className="text-sm italic opacity-50 font-spectral tracking-wide text-text-main">
+        <p className="text-[9px] md:text-sm italic opacity-50 font-spectral tracking-wide text-text-main px-4">
           "La baraja decidirá tu reino"
         </p>
       </footer>
