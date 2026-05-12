@@ -99,12 +99,12 @@ const CardGallery: React.FC = () => {
                   boxShadow: `0 0 20px ${suitColors[card.suit]}11`
                 }}
               >
-                {/* Resplandor interno del color del palo al pasar el ratón */}
+                {/* Resplandor interno sutil */}
                 <div 
-                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none z-10"
+                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-700 pointer-events-none z-10"
                     style={{ 
-                        background: `radial-gradient(circle at center, ${suitColors[card.suit]}05 0%, transparent 70%)`,
-                        boxShadow: `inset 0 0 30px ${suitColors[card.suit]}22`
+                        background: `radial-gradient(circle at 50% 50%, ${suitColors[card.suit]}05 0%, transparent 70%)`,
+                        boxShadow: `inset 0 0 20px ${suitColors[card.suit]}11`
                     }}
                 />
                 {/* Marcador de posición para la imagen completa de la carta */}
@@ -113,7 +113,7 @@ const CardGallery: React.FC = () => {
                     <img 
                       src={card.image} 
                       alt={card.name} 
-                      className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110"
+                      className="w-full h-full object-cover transition-all duration-700"
                       onLoad={(e) => (e.target as HTMLImageElement).classList.add('opacity-100')}
                       onError={(e) => {
                           (e.target as HTMLImageElement).style.display = 'none';
@@ -121,50 +121,47 @@ const CardGallery: React.FC = () => {
                     />
                   ) : null}
                   
-                  {/* Contenido sutil de marcador si no hay imagen disponible */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center opacity-40 group-hover:opacity-100 transition-opacity duration-500">
-                    <div className="w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent mb-4" />
-                    <span className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-cinzel">
-                      {card.role}
-                    </span>
-                    <div className="w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent mt-4" />
-                  </div>
                 </div>
 
-                {/* Arriba Izquierda: Burbuja de Coste de Voluntad */}
-                <div className="absolute top-2 left-2 z-20">
-                  <div 
-                    className="w-10 h-10 rounded-full bg-black/90 backdrop-blur-md flex items-center justify-center border-2 shadow-2xl transition-all duration-300 group-hover:scale-110"
-                    style={{ borderColor: suitColors[card.suit] }}
-                  >
-                    <span className="text-lg font-bold font-spectral" style={{ color: suitColors[card.suit] }}>
-                      {card.cost}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Arriba Derecha: Número de Rango de la carta */}
-                <div className="absolute top-2 right-2 z-20">
-                  <div 
-                    className="px-2 py-1 rounded-sm bg-black/60 backdrop-blur-sm border border-white/10 text-[10px] font-bold text-gray-400 group-hover:text-white transition-colors"
-                  >
-                    Nº {card.rank}
-                  </div>
-                </div>
 
                 {/* Capa de información al pasar el ratón (Detalles de la carta) */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-5">
-                    <div className="mb-2">
-                        <p className="text-[11px] text-primary-gold uppercase tracking-widest font-bold mb-1">
+                <div className="absolute inset-0 bg-black/70 backdrop-blur-[4px] opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col p-6">
+                    {/* Nombre/Rol central */}
+                    <div className="flex-1 flex flex-col items-center justify-center">
+                        <div className="w-16 h-px bg-primary-gold/30 mb-4" />
+                        <span className="text-[12px] uppercase tracking-[0.4em] text-white/50 font-cinzel">
+                            {card.role}
+                        </span>
+                        <div className="w-16 h-px bg-primary-gold/30 mt-4" />
+                    </div>
+
+                    {/* Detalles inferiores mejorados */}
+                    <div className="mb-3">
+                        <p className="text-[14px] text-primary-gold uppercase tracking-widest font-bold mb-1 drop-shadow-md">
                             {card.name}
                         </p>
-                        <p className="text-[9px] text-gray-400 uppercase tracking-tighter">
+                        <p className="text-[11px] text-white/90 uppercase tracking-tighter font-medium">
                             {card.attackType} • ATK: {card.attack} • HP: {card.health}
                         </p>
                     </div>
-                    <p className="text-[9px] text-gray-300 italic leading-snug border-t border-white/10 pt-2">
+                    <p className="text-[11px] text-gray-200 italic leading-relaxed border-t border-white/20 pt-3">
                         {card.effect}
                     </p>
+                </div>
+              </div>
+
+              {/* Arriba Derecha: Burbuja de Coste de Voluntad (Sobresaliendo) */}
+              <div className="absolute -top-2 -right-2 z-30 transition-all duration-500 group-hover:-translate-y-2">
+                <div 
+                  className="w-9 h-9 rounded-full bg-black/95 backdrop-blur-md flex items-center justify-center border-2 shadow-2xl transition-all duration-300 group-hover:scale-110"
+                  style={{ 
+                    borderColor: suitColors[card.suit],
+                    boxShadow: `0 0 15px ${suitColors[card.suit]}44`
+                  }}
+                >
+                  <span className="text-base font-bold font-spectral" style={{ color: suitColors[card.suit] }}>
+                    {card.cost}
+                  </span>
                 </div>
               </div>
             </motion.div>
