@@ -4,11 +4,14 @@ import LoginPage from './pages/Login/LoginPage';
 import MainMenu from './pages/Menu/MainMenu';
 import SplashPage from './pages/Splash/SplashPage';
 
+import { testMongoConnection } from './services/mongotest';
+
 function InitialRedirect() {
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
+    testMongoConnection();
     // If the user refreshes on any page other than Splash, send them to Splash
     if (location.pathname !== '/') {
       navigate('/');
