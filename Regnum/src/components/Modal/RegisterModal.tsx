@@ -11,8 +11,8 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose }) => {
   const [formData, setFormData] = React.useState({
     nombre: '',
     email: '',
-    contraseña: '',
-    confirmarContraseña: ''
+    password: '',
+    confirmarPassword: ''
   });
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
@@ -26,7 +26,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose }) => {
     e.preventDefault();
     setError(null);
 
-    if (formData.contraseña !== formData.confirmarContraseña) {
+    if (formData.password !== formData.confirmarPassword) {
       setError('Las contraseñas no coinciden');
       return;
     }
@@ -39,7 +39,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose }) => {
         body: JSON.stringify({
           nombre: formData.nombre,
           email: formData.email,
-          contraseña: formData.contraseña
+          password: formData.password
         }),
       });
 
@@ -50,7 +50,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose }) => {
         setTimeout(() => {
           onClose();
           setSuccess(false);
-          setFormData({ nombre: '', email: '', contraseña: '', confirmarContraseña: '' });
+          setFormData({ nombre: '', email: '', password: '', confirmarPassword: '' });
         }, 2000);
       } else {
         setError(data.message || 'Error al registrar usuario');
@@ -139,8 +139,8 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose }) => {
                   <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
                   <input 
                     type="password" 
-                    name="contraseña"
-                    value={formData.contraseña}
+                    name="password"
+                    value={formData.password}
                     onChange={handleChange}
                     required
                     placeholder="••••••••"
@@ -155,8 +155,8 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose }) => {
                   <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
                   <input 
                     type="password" 
-                    name="confirmarContraseña"
-                    value={formData.confirmarContraseña}
+                    name="confirmarPassword"
+                    value={formData.confirmarPassword}
                     onChange={handleChange}
                     required
                     placeholder="••••••••"

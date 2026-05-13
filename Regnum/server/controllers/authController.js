@@ -1,14 +1,13 @@
-//requerimientos para la conexion
 const { getDB } = require('../config/db');
 
 const login = async (req, res) => {
     try {
-        const { nombre, contraseña } = req.body;
+        const { nombre, password } = req.body;
 
-        if (!nombre || !contraseña) {
+        if (!nombre || !password) {
             return res.status(400).json({
                 success: false,
-                message: 'Nombre y contraseña son requeridos'
+                message: 'Nombre y password son requeridos'
             });
         }
 
@@ -23,9 +22,10 @@ const login = async (req, res) => {
         }
 
         console.log('Buscando usuario:', nombre);
-        const usuario = await db.collection('usuarios').findOne({
-            nombre: nombre
-        });
+
+        const usuario = await db.collection('usuarios').findOne({ nombre });
+
+        console.log("🧾 USUARIO EN DB:", usuario);
 
         if (!usuario) {
             return res.status(404).json({
@@ -34,26 +34,30 @@ const login = async (req, res) => {
             });
         }
 
-        // Comprobar contraseña (por ahora comparación directa, idealmente usar bcrypt)
-        if (usuario.contraseña !== contraseña) {
+        // 🔐 comparación de password - buscar en todos los posibles campos
+        console.log("🔑 CAMPOS DEL USUARIO:", Object.keys(usuario));
+        const storedPassword = usuario.contrasena || usuario.contraseña || usuario.password;
+        console.log("🔐 PASS DB:", storedPassword);
+        console.log("🔐 PASS INPUT:", password);
+
+        if (storedPassword !== password) {
             return res.status(401).json({
                 success: false,
-                message: 'Contraseña incorrecta'
+                message: 'Password incorrecta'
             });
         }
 
-        // Si todo sale bien
-        res.json({
+        return res.json({
             success: true,
             message: 'Login correcto',
             usuario: {
-                nombre: usuario.nombre,
-                // No devolvemos la contraseña al frontend
+                nombre: usuario.nombre
             }
         });
 
     } catch (error) {
-        res.status(500).json({
+        console.error("💥 ERROR EN LOGIN:", error);
+        return res.status(500).json({
             success: false,
             error: error.message
         });
@@ -62,9 +66,11 @@ const login = async (req, res) => {
 
 const register = async (req, res) => {
     try {
-        const { nombre, email, contraseña } = req.body;
+        const { nombre, email, password } = req.body;
 
-        if (!nombre || !email || !contraseña) {
+        console.log("📩 BODY RECIBIDO:", req.body);
+
+        if (!nombre || !email || !password) {
             return res.status(400).json({
                 success: false,
                 message: 'Todos los campos son requeridos'
@@ -81,9 +87,8 @@ const register = async (req, res) => {
             });
         }
 
-        // Verificar si el usuario ya existe
         const usuarioExistente = await db.collection('usuarios').findOne({
-            $or: [{ nombre: nombre }, { email: email }]
+            $or: [{ nombre }, { email }]
         });
 
         if (usuarioExistente) {
@@ -93,31 +98,30 @@ const register = async (req, res) => {
             });
         }
 
-        // Crear el nuevo usuario
         const nuevoUsuario = {
             nombre,
             email,
-            contraseña, // En producción usar bcrypt para hashear
+            contrasena: password, // se guarda como contrasena en DB
             createdAt: new Date()
         };
 
         await db.collection('usuarios').insertOne(nuevoUsuario);
 
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
             message: 'Usuario registrado correctamente'
         });
 
     } catch (error) {
-        res.status(500).json({
+        console.error("💥 ERROR EN REGISTER:", error);
+        return res.status(500).json({
             success: false,
             error: error.message
         });
     }
 };
 
-//exportar al login
 module.exports = {
     login,
     register
-}
+};

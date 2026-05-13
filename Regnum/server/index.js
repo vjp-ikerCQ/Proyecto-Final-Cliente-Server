@@ -15,33 +15,34 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-//Rutas
+// Rutas
 app.use('/api', authRoutes);
 
-//Ruta test
+// Ruta test
 app.get('/api/test', (req, res) => {
     res.json({
         message: 'Backend funcionando'
     });
 });
 
-//Iniciar servidor
-app.listen(PORT, async () => {
+async function startServer() {
 
-    console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-
-    await connectDB();
-
-});
-
-
-/* Ruta para obtener cartas (ejemplo)
-app.get('/api/cartas', async (req, res) => {
     try {
-        const cartas = await db.collection('cartas').find({}).toArray();
-        res.json(cartas);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});*/
 
+        await connectDB();
+
+        app.listen(PORT, () => {
+
+            console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+    }
+
+}
+
+startServer();

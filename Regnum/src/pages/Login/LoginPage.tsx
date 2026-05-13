@@ -36,7 +36,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         },
         body: JSON.stringify({
           nombre: username,
-          contraseña: password
+          password: password
         }),
       });
 
