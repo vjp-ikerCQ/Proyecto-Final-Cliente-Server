@@ -3,11 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield,
   Swords,
-  Flame,
-  Zap,
   Layers,
-  ArrowLeft,
-  Info
+  ArrowLeft
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { allCards, type CardData } from '../../utils/cardData';
@@ -121,14 +118,14 @@ const Game: React.FC = () => {
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/50 to-black pointer-events-none" />
 
       {/* HEADER */}
-      <header className="relative z-20 p-2 md:p-4 flex flex-col sm:flex-row justify-between items-center gap-2 md:gap-4 border-b border-white/5 bg-black/40 backdrop-blur-md shrink-0">
+      <header className="relative z-20 p-1 md:p-2 lg:p-3 flex flex-col sm:flex-row justify-between items-center gap-1 md:gap-3 border-b border-white/5 bg-black/40 backdrop-blur-md shrink-0">
         <div className="flex justify-between w-full sm:w-auto items-center px-2">
           <button
             onClick={() => setShowSurrenderModal(true)}
             className="flex items-center gap-1.5 text-gray-500 hover:text-red-500 transition-colors"
           >
-            <ArrowLeft size={14} className="md:w-4 md:h-4" />
-            <span className="uppercase tracking-widest text-[8px] md:text-[10px]">Rendirse</span>
+            <ArrowLeft size={12} className="md:w-3.5 md:h-3.5" />
+            <span className="uppercase tracking-widest text-[7px] md:text-[9px]">Rendirse</span>
           </button>
           <div className="text-lg font-black text-gold-gradient tracking-widest uppercase sm:hidden">REGNUM</div>
           <div className="w-6 sm:hidden" />
@@ -150,16 +147,16 @@ const Game: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 md:gap-4 px-2">
+        <div className="flex items-center gap-1.5 md:gap-3 px-2">
           <div className="flex flex-col items-end">
-            <span className="text-[7px] md:text-[9px] text-primary-gold uppercase tracking-widest">V</span>
-            <span className="text-base md:text-xl font-black text-white leading-none">{voluntad}</span>
+            <span className="text-[6px] md:text-[8px] text-primary-gold uppercase tracking-widest leading-none">V</span>
+            <span className="text-sm md:text-lg font-black text-white leading-none">{voluntad}</span>
           </div>
           <div className="flex gap-0.5">
             {Array.from({ length: 10 }).map((_, i) => (
               <div
                 key={i}
-                className={`w-1 md:w-1.5 h-3 md:h-5 rounded-full transition-all duration-500 ${i < voluntad ? 'bg-primary-gold shadow-[0_0_8px_rgba(166,138,100,0.6)]' : 'bg-white/5'
+                className={`w-0.5 md:w-1 h-2.5 md:h-4 rounded-full transition-all duration-500 ${i < voluntad ? 'bg-primary-gold shadow-[0_0_6px_rgba(166,138,100,0.6)]' : 'bg-white/5'
                   }`}
               />
             ))}
@@ -168,21 +165,21 @@ const Game: React.FC = () => {
       </header>
 
       {/* TABLERO */}
-      <main className="flex-1 relative z-10 flex flex-col justify-center items-center gap-4 md:gap-8 p-4 md:p-8 overflow-visible">
-        <div className="flex justify-center gap-2 md:gap-6 w-full max-w-4xl overflow-visible">
+      <main className="flex-1 relative z-10 flex flex-col justify-center items-center gap-2 md:gap-4 p-2 md:p-4 overflow-visible">
+        <div className="flex justify-center gap-2 md:gap-4 w-full max-w-3xl overflow-visible">
           {opponentBoard.map((slot, i) => (
             <BoardSlotView key={`opp-${i}`} slot={slot} isOpponent onSelect={setViewingCard} />
           ))}
         </div>
-        <div className="w-[80%] max-w-2xl h-px bg-gradient-to-r from-transparent via-white/10 to-transparent relative">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#050505] px-2 md:px-4 py-0.5 border border-white/5 rounded-full flex items-center gap-1.5 md:gap-3 shadow-2xl">
-            <div className="text-[7px] md:text-[10px] uppercase tracking-widest text-blue-400 font-bold whitespace-nowrap">
+        <div className="w-[60%] max-w-xl h-px bg-gradient-to-r from-transparent via-white/10 to-transparent relative">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#050505] px-2 md:px-3 py-0.5 border border-white/5 rounded-full flex items-center gap-1 md:gap-2 shadow-2xl">
+            <div className="text-[6px] md:text-[9px] uppercase tracking-widest text-blue-400 font-bold whitespace-nowrap">
               DEF: {board.filter(s => s.card).length * 25}%
             </div>
-            <Swords size={10} className="text-white/20 md:w-4 md:h-4" />
+            <Swords size={9} className="text-white/20 md:w-3.5 md:h-3.5" />
           </div>
         </div>
-        <div className="flex justify-center gap-2 md:gap-6 w-full max-w-4xl overflow-visible">
+        <div className="flex justify-center gap-2 md:gap-4 w-full max-w-3xl overflow-visible">
           {board.map((slot, i) => (
             <BoardSlotView
               key={`player-${i}`}
@@ -196,17 +193,17 @@ const Game: React.FC = () => {
       </main>
 
       {/* FOOTER: Mano y Controles */}
-      <footer className="relative z-20 p-2 md:p-6 bg-gradient-to-t from-black via-black/95 to-transparent flex flex-col md:flex-row justify-center items-center gap-4 md:gap-8 shrink-0 border-t border-white/5 overflow-visible">
-        <div className="flex items-center gap-4 md:gap-10 w-full md:w-auto justify-center overflow-visible">
-          <div className="flex flex-col items-center gap-1.5 group cursor-pointer" onClick={drawCard}>
-            <div className="w-12 h-18 sm:w-16 sm:h-24 md:w-24 md:h-36 border border-white/10 rounded-md md:rounded-xl bg-[#080808] flex items-center justify-center group-hover:border-primary-gold/50 transition-all shadow-2xl relative overflow-hidden shrink-0">
-              <Layers className="text-white/10 group-hover:text-primary-gold/40 transition-colors" size={18} />
+      <footer className="relative z-20 p-2 md:p-3 bg-gradient-to-t from-black via-black/95 to-transparent flex flex-col md:flex-row justify-center items-center gap-2 md:gap-6 shrink-0 border-t border-white/5 overflow-visible">
+        <div className="flex items-center gap-3 md:gap-6 w-full md:w-auto justify-center overflow-visible">
+          <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={drawCard}>
+            <div className="w-10 h-15 sm:w-14 sm:h-21 md:w-18 md:h-28 border border-white/10 rounded-md bg-[#080808] flex items-center justify-center group-hover:border-primary-gold/50 transition-all shadow-2xl relative overflow-hidden shrink-0">
+              <Layers className="text-white/10 group-hover:text-primary-gold/40 transition-colors" size={16} />
               <div className="absolute inset-0 bg-gradient-to-tr from-primary-gold/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
-            <span className="text-[7px] md:text-[9px] uppercase tracking-widest text-gray-500 font-bold">Mazo | 1v</span>
+            <span className="text-[6px] md:text-[8px] uppercase tracking-widest text-gray-500 font-bold">Mazo | 1v</span>
           </div>
 
-          <div className="flex gap-1.5 md:gap-4 items-end px-2 md:px-6 pt-10 md:pt-16 pb-2 overflow-x-auto overflow-y-visible max-w-[75vw] md:max-w-none scrollbar-hide">
+          <div className="flex gap-1 md:gap-3 items-end px-1 md:px-4 pt-4 md:pt-6 pb-1 overflow-x-auto overflow-y-visible max-w-[85vw] md:max-w-none scrollbar-hide">
             <AnimatePresence>
               {hand.map((card, i) => (
                 <GameCard
@@ -254,13 +251,13 @@ const Game: React.FC = () => {
         {viewingCard && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-black/95 backdrop-blur-md overflow-y-auto"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-black/60 backdrop-blur-sm overflow-y-auto"
             onClick={() => setViewingCard(null)}
           >
             <div className="max-w-4xl w-full flex flex-col md:flex-row gap-6 md:gap-12 items-center" onClick={e => e.stopPropagation()}>
               <motion.div
                 initial={{ scale: 0.8 }} animate={{ scale: 1 }}
-                className="w-48 sm:w-64 md:w-80 aspect-[2/3] rounded-2xl border-2 shadow-2xl overflow-hidden relative shrink-0"
+                className="w-full max-w-[220px] sm:max-w-[280px] md:max-w-[350px] aspect-[2/3] rounded-xl border border-white/10 shadow-2xl overflow-hidden relative shrink-0 max-h-[65vh]"
                 style={{ borderColor: suitColors[viewingCard.suit] }}
               >
                 <img src={viewingCard.image} className="w-full h-full object-cover" />
@@ -338,8 +335,8 @@ const GameCard: React.FC<{
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       className={`
-        relative aspect-[2/3] w-14 sm:w-20 md:w-32 cursor-pointer group shrink-0 transition-all duration-300
-        ${isSelected ? 'scale-105 -translate-y-3 md:-translate-y-6 z-50' : 'hover:z-40 hover:-translate-y-2'}
+        relative aspect-[2/3] w-12 sm:w-16 md:w-24 lg:w-28 cursor-pointer group shrink-0 transition-all duration-300
+        ${isSelected ? 'scale-105 -translate-y-2 md:-translate-y-4 z-50' : 'hover:z-40 hover:-translate-y-2'}
       `}
       onClick={onClick}
       onContextMenu={onRightClick}
@@ -367,9 +364,6 @@ const GameCard: React.FC<{
 
             {/* Info inferior: Nombre, Stats y Descripción */}
             <div className="mt-auto text-center md:text-left">
-              <p className="text-[7px] md:text-[12px] text-primary-gold uppercase tracking-widest font-black mb-0.5 truncate">
-                {card.name}
-              </p>
               <div className="flex justify-between items-center mb-1">
                 <span className="text-[6px] md:text-[10px] text-white/70 uppercase">ATK: {card.attack}</span>
                 <span className="text-[6px] md:text-[10px] text-white/70 uppercase">HP: {card.health}</span>
@@ -407,7 +401,7 @@ const BoardSlotView: React.FC<{
     <div
       onClick={onClick}
       className={`
-        flex-1 max-w-[80px] sm:max-w-[100px] md:max-w-[140px] aspect-[2/3] rounded-lg md:rounded-xl border flex items-center justify-center relative transition-all duration-500
+        flex-1 max-w-[70px] sm:max-w-[90px] md:max-w-[110px] lg:max-w-[120px] aspect-[2/3] rounded-lg border flex items-center justify-center relative transition-all duration-500
         ${slot.card
           ? 'border-white/5'
           : isActiveToPlay
@@ -444,9 +438,6 @@ const BoardSlotView: React.FC<{
 
                 {/* Info inferior: Nombre, Stats y Descripción */}
                 <div className="mt-auto text-center md:text-left">
-                  <p className="text-[7px] md:text-[12px] text-primary-gold uppercase tracking-widest font-black mb-0.5 truncate">
-                    {slot.card.name}
-                  </p>
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-[6px] md:text-[10px] text-white/70 uppercase">ATK: {slot.card.attack}</span>
                     <span className="text-[6px] md:text-[10px] text-white/70 uppercase">HP: {slot.card.health}</span>

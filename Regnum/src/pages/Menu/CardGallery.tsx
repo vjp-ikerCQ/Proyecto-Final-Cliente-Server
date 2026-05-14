@@ -122,9 +122,6 @@ const CardGallery: React.FC = () => {
                     </div>
 
                     <div className="mt-auto">
-                        <p className="text-[10px] md:text-[14px] text-primary-gold uppercase tracking-widest font-bold mb-0.5 truncate">
-                            {card.name}
-                        </p>
                         <div className="flex justify-between items-center mb-1">
                             <span className="text-[8px] md:text-[11px] text-white/70 uppercase">
                                 ATK: {card.attack}
@@ -165,7 +162,7 @@ const CardGallery: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-black/98 backdrop-blur-xl"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-black/70 backdrop-blur-md"
             onClick={() => setSelectedCard(null)}
           >
             <motion.div 
@@ -175,39 +172,27 @@ const CardGallery: React.FC = () => {
               className="max-w-5xl w-full flex flex-col md:flex-row gap-8 md:gap-16 items-center md:items-start" 
               onClick={e => e.stopPropagation()}
             >
-              {/* Carta en Grande */}
-              <div className="w-64 sm:w-80 md:w-[450px] aspect-[2/3] relative shrink-0">
+              {/* Carta en Grande - Ajuste fino de escala (-10px adicionales) */}
+              <div className="w-full max-w-[235px] sm:max-w-[335px] md:max-w-[405px] lg:max-w-[465px] aspect-[2/3] relative shrink-0">
                 <div 
-                  className="w-full h-full rounded-2xl md:rounded-[2.5rem] border-4 overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.8)] relative group"
-                  style={{ borderColor: suitColors[selectedCard.suit] }}
+                  className="w-full h-full rounded-2xl md:rounded-[2.5rem] overflow-hidden shadow-2xl relative border-2"
+                  style={{ borderColor: `${suitColors[selectedCard.suit]}44` }}
                 >
-                  <img src={selectedCard.image} className="w-full h-full object-cover" alt={selectedCard.name} />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60" />
-                  
-                  {/* Burbuja de Coste Gigante */}
-                  <div className="absolute -top-4 -right-4 md:-top-8 md:-right-8 z-30">
-                    <div 
-                      className="w-12 h-12 md:w-24 md:h-24 rounded-full bg-black flex items-center justify-center border-2 md:border-8 shadow-2xl"
-                      style={{ borderColor: suitColors[selectedCard.suit] }}
-                    >
-                      <span className="text-xl md:text-5xl font-black" style={{ color: suitColors[selectedCard.suit] }}>
-                        {selectedCard.cost}
-                      </span>
-                    </div>
-                  </div>
+                  <img src={selectedCard.image} className="w-full h-full object-cover bg-black" alt={selectedCard.name} />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60" />
                 </div>
               </div>
 
               {/* Información Detallada */}
               <div className="flex-1 space-y-6 md:space-y-10 text-center md:text-left py-4 md:py-10">
                 <div className="relative">
-                  <span className="text-[10px] md:text-xs uppercase tracking-[0.5em] text-primary-gold mb-2 block font-spectral font-black">
+                  <span className="text-[8px] md:text-[10px] uppercase tracking-[0.5em] text-primary-gold mb-1 block font-spectral font-black">
                     {selectedCard.suit} / {selectedCard.role}
                   </span>
-                  <h2 className="text-4xl sm:text-6xl md:text-8xl font-black text-white uppercase tracking-tighter leading-none mb-4">
+                  <h2 className="text-2xl sm:text-4xl md:text-6xl font-black text-white uppercase tracking-tighter leading-none mb-2">
                     {selectedCard.name}
                   </h2>
-                  <div className="h-1 w-24 md:w-40 bg-primary-gold mx-auto md:mx-0" />
+                  <div className="h-1 w-20 md:w-40 bg-primary-gold mx-auto md:mx-0" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 md:gap-8 max-w-md mx-auto md:mx-0">

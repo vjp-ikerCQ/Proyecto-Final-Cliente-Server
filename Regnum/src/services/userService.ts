@@ -12,6 +12,7 @@ import type { RankingEntry } from '../types/index';
  */
 export const getUserStats = async (username: string): Promise<UserStats> => {
   // Simulación de retraso de red
+  console.log(`Cargando estadísticas para: ${username}`);
   await new Promise(resolve => setTimeout(resolve, 500));
 
   // En el futuro, esto será: return fetch(`/api/stats/${username}`).then(res => res.json());
@@ -40,4 +41,23 @@ export const getRankings = async (): Promise<RankingEntry[]> => {
     { id: '7', name: 'Perceval', wins: 65, rank: 7 },
     { id: '8', name: 'Mordred', wins: 50, rank: 8 },
   ];
+};
+/**
+ * Elimina la cuenta del usuario actual
+ */
+export const deleteAccount = async (username: string, password: string): Promise<{ success: boolean; message: string }> => {
+  try {
+    const response = await fetch('http://localhost:5000/api/delete-account', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ nombre: username, password }),
+    });
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error al eliminar cuenta:', error);
+    return { success: false, message: 'No se pudo conectar con el servidor' };
+  }
 };
