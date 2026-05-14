@@ -11,18 +11,26 @@ import type { RankingEntry } from '../types/index';
  * Obtiene las estadísticas de un usuario específico por su nombre
  */
 export const getUserStats = async (username: string): Promise<UserStats> => {
-  // Simulación de retraso de red
-  console.log(`Cargando estadísticas para: ${username}`);
-  await new Promise(resolve => setTimeout(resolve, 500));
+  try {
+    const response = await fetch(`http://localhost:5000/api/stats/${username}`);
+    const data = await response.json();
 
-  // En el futuro, esto será: return fetch(`/api/stats/${username}`).then(res => res.json());
-  return {
-    gamesPlayed: 42,
-    gamesWon: 28,
-    gamesLost: 14,
-    winRate: '66%',
-    playTime: '12h 45m'
-  };
+    if (data.success) {
+      return data.stats;
+    }
+    
+    throw new Error(data.message || 'Error al obtener estadísticas');
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+    // Fallback por defecto si el servidor falla
+    return {
+      gamesPlayed: 0,
+      gamesWon: 0,
+      gamesLost: 0,
+      winRate: '0%',
+      playTime: '0h 0m'
+    };
+  }
 };
 
 /**

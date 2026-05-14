@@ -1,0 +1,68 @@
+const { getDB } = require('../config/db');
+
+const getUserStats = async (req, res) => {
+    try {
+        const { username } = req.params;
+
+        const db = getDB();
+        if (!db) {
+            console.error('Database not connected');
+            return res.status(503).json({
+                success: false,
+                message: 'El servidor no está conectado a la base de datos'
+            });
+        }
+
+        const usuario = await db.collection('usuarios').findOne({ nombre: username });
+
+        if (!usuario) {
+            return res.status(404).json({
+                success: false,
+                message: 'Usuario no encontrado'
+            });
+        }
+
+        // Obtener estadísticas o valores por defecto
+        const stats = usuario.estadisticas || {
+            partidasJugadas: 0,
+            partidasGanadas: 0,
+            partidasPerdidas: 0,
+            tiempoJugado: 0
+        };
+
+        // Calcular porcentaje de victoria (Win Rate)
+        let winRate = '0%';
+        if (stats.partidasJugadas > 0) {
+            const rate = Math.round((stats.partidasGanadas / stats.partidasJugadas) * 100);
+            winRate = `${rate}%`;
+        }
+
+        // Formatear el tiempo jugado (asumiendo que viene en minutos de la base de datos)
+        // Ejemplo: 765 minutos = 12h 45m
+        const horas = Math.floor(stats.tiempoJugado / 60);
+        const minutos = stats.tiempoJugado % 60;
+        const playTime = `${horas}h ${minutos}m`;
+
+        return res.json({
+            success: true,
+            stats: {
+                gamesPlayed: stats.partidasJugadas,
+                gamesWon: stats.partidasGanadas,
+                gamesLost: stats.partidasPerdidas,
+                winRate: winRate,
+                playTime: playTime
+            }
+        });
+
+    } catch (error) {
+        console.error("💥 ERROR EN GET STATS:", error);
+        return res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+module.exports = {
+    getUserStats
+};
