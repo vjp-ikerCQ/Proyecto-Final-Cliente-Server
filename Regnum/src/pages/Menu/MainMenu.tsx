@@ -17,6 +17,7 @@ import StatsModal from '../../components/Modal/StatsModal';
 import RankingsModal from '../../components/Modal/RankingsModal';
 import GameControls from '../../components/UI/GameControls';
 import FireParticles from '../../components/UI/FireParticles';
+import AtmosphereParticles from '../../components/AtmosphereParticles';
 import { BarChart2 } from 'lucide-react';
 
 /**
@@ -88,7 +89,8 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
   return (
     <div className="relative flex flex-col items-center justify-between h-screen p-4 md:p-8 overflow-hidden bg-menu-pattern transition-all duration-500">
 
-      {/* Partículas de fuego ambientales */}
+      {/* Partículas ambientales */}
+      <AtmosphereParticles />
       <FireParticles />
 
       {/* Controles globales (Sonido, Tema) */}
@@ -136,7 +138,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
           >
             <CornerDecoration />
             <div className={`${item.primary ? 'text-bg-main' : 'text-primary-gold group-hover:text-white'} transition-colors`}>
-              {React.cloneElement(item.icon as React.ReactElement, { size: 14 })}
+              {React.cloneElement(item.icon as any, { size: (typeof window !== 'undefined' && window.innerWidth < 768) ? 14 : 20 })}
             </div>
             <span className="text-[10px] md:text-base tracking-[0.2em] uppercase font-cinzel">
               {item.text}

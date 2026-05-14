@@ -54,7 +54,7 @@ const RankingsModal: React.FC<RankingsModalProps> = ({ isOpen, onClose }) => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/90 backdrop-blur-md"
+            className="absolute inset-0 bg-modal-backdrop backdrop-blur-md"
           />
 
           {/* Contenido del Modal */}
@@ -62,7 +62,7 @@ const RankingsModal: React.FC<RankingsModalProps> = ({ isOpen, onClose }) => {
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            className="relative w-full max-w-2xl bg-[#0f0f12] border border-primary-gold/20 p-8 shadow-[0_0_100px_rgba(0,0,0,0.8)] overflow-hidden"
+            className="relative w-full max-w-2xl bg-modal border border-primary-gold/20 p-8 shadow-[0_0_100px_rgba(0,0,0,0.8)] overflow-hidden"
           >
             {/* Decoraciones de esquina góticas */}
             <div className="absolute top-0 left-0 w-12 h-12 border-t-2 border-l-2 border-primary-gold/10 pointer-events-none" />
@@ -83,7 +83,7 @@ const RankingsModal: React.FC<RankingsModalProps> = ({ isOpen, onClose }) => {
                   <p className="text-[10px] tracking-[0.3em] uppercase text-gray-500">Los Maestros del Reino</p>
                 </div>
               </div>
-              <button onClick={onClose} className="p-2 text-gray-500 hover:text-white transition-colors">
+              <button onClick={onClose} className="p-2 text-muted hover:text-text-main transition-colors">
                 <X size={28} />
               </button>
             </div>
@@ -105,8 +105,8 @@ const RankingsModal: React.FC<RankingsModalProps> = ({ isOpen, onClose }) => {
                       transition={{ delay: index * 0.05 }}
                       className={`
                         flex items-center justify-between p-5 transition-all duration-300 group
-                        ${index < 3 ? 'bg-primary-gold/5 border border-primary-gold/20' : 'bg-white/5 border border-transparent'}
-                        hover:bg-white/10 hover:translate-x-2
+                        ${index < 3 ? 'bg-primary-gold/5 border border-primary-gold/20' : 'bg-surface border border-transparent'}
+                        hover:bg-surface-hover hover:translate-x-2
                       `}
                     >
                       <div className="flex items-center gap-6">
@@ -114,7 +114,7 @@ const RankingsModal: React.FC<RankingsModalProps> = ({ isOpen, onClose }) => {
                           {getRankIcon(entry.rank)}
                         </div>
                         <div className="flex flex-col">
-                          <span className={`text-lg font-bold font-cinzel ${index < 3 ? 'text-primary-gold' : 'text-gray-300'}`}>
+                          <span className={`text-lg font-bold font-cinzel ${index < 3 ? 'text-primary-gold' : 'text-text-main'}`}>
                             {entry.name}
                           </span>
                           <span className="text-[10px] text-gray-500 uppercase tracking-widest">Aspirante al Trono</span>

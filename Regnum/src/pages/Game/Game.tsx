@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { allCards, type CardData } from '../../utils/cardData';
+import AtmosphereParticles from '../../components/AtmosphereParticles';
 
 /**
  * Colores representativos para cada palo
@@ -51,6 +52,15 @@ const Game: React.FC = () => {
   const [selectedHandCardIndex, setSelectedHandCardIndex] = useState<number | null>(null);
   const [viewingCard, setViewingCard] = useState<CardData | null>(null);
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
+  const [isShaking, setIsShaking] = useState(false);
+
+  useEffect(() => {
+    if (voluntad < 5) {
+      setIsShaking(true);
+      const timer = setTimeout(() => setIsShaking(false), 400);
+      return () => clearTimeout(timer);
+    }
+  }, [voluntad]);
 
   // Inicializar mano
   useEffect(() => {
@@ -112,8 +122,13 @@ const Game: React.FC = () => {
   const selectedIsJoker = selectedHandCardIndex !== null && hand[selectedHandCardIndex].suit === 'jokers';
 
   return (
-    <div className="h-screen w-full bg-[#050505] text-white overflow-hidden font-spectral flex flex-col relative">
+    <motion.div 
+      animate={isShaking ? { x: [-2, 2, -2, 2, 0], y: [-1, 1, -1, 1, 0] } : {}}
+      transition={{ duration: 0.4 }}
+      className="h-screen w-full bg-bg-main text-text-main overflow-hidden font-spectral flex flex-col relative"
+    >
       {/* Fondo con atmósfera */}
+      <AtmosphereParticles />
       <div className="absolute inset-0 bg-menu-pattern opacity-20 pointer-events-none" />
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/50 to-black pointer-events-none" />
 
@@ -251,13 +266,13 @@ const Game: React.FC = () => {
         {viewingCard && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-black/60 backdrop-blur-sm overflow-y-auto"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-modal-backdrop backdrop-blur-sm overflow-y-auto"
             onClick={() => setViewingCard(null)}
           >
             <div className="max-w-4xl w-full flex flex-col md:flex-row gap-6 md:gap-12 items-center" onClick={e => e.stopPropagation()}>
               <motion.div
                 initial={{ scale: 0.8 }} animate={{ scale: 1 }}
-                className="w-full max-w-[220px] sm:max-w-[280px] md:max-w-[350px] aspect-[2/3] rounded-xl border border-white/10 shadow-2xl overflow-hidden relative shrink-0 max-h-[65vh]"
+                className="w-full max-w-[220px] sm:max-w-[280px] md:max-w-[350px] aspect-[2/3] rounded-xl border border-white/10 shadow-2xl overflow-hidden relative shrink-0 max-h-[65vh] card-holographic"
                 style={{ borderColor: suitColors[viewingCard.suit] }}
               >
                 <img src={viewingCard.image} className="w-full h-full object-cover" />
@@ -269,7 +284,7 @@ const Game: React.FC = () => {
                     <span className="text-[8px] md:text-[10px] uppercase tracking-widest text-primary-gold border border-primary-gold/30 px-2 py-0.5">{viewingCard.role}</span>
                   </div>
                 </div>
-                <div className="p-4 bg-white/[0.03] border border-white/10 rounded-xl italic text-gray-400">"{viewingCard.effect}"</div>
+                <div className="p-4 bg-surface border border-accent-gray/20 rounded-xl italic text-secondary-theme">"{viewingCard.effect}"</div>
                 <button onClick={() => setViewingCard(null)} className="md:hidden w-full py-3 bg-white/10 uppercase tracking-widest text-[10px] font-bold">Cerrar</button>
               </div>
             </div>
@@ -319,7 +334,7 @@ const Game: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 };
 
@@ -333,16 +348,23 @@ const GameCard: React.FC<{
     <motion.div
       layout
       initial={{ opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={{ 
+        opacity: 1, 
+        y: 0,
+        scale: isSelected ? 1.1 : 1
+      }}
+      whileHover={{ scale: isSelected ? 1.15 : 1.05 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
       className={`
-        relative aspect-[2/3] w-12 sm:w-16 md:w-24 lg:w-28 cursor-pointer group shrink-0 transition-all duration-300
-        ${isSelected ? 'scale-105 -translate-y-2 md:-translate-y-4 z-50' : 'hover:z-40 hover:-translate-y-2'}
+        relative aspect-[2/3] w-12 sm:w-16 md:w-24 lg:w-28 cursor-pointer group shrink-0
+        ${isSelected ? 'z-50 -translate-y-4' : 'hover:z-40 hover:-translate-y-2'}
       `}
       onClick={onClick}
       onContextMenu={onRightClick}
     >
       <div
-        className={`w-full h-full relative rounded-md md:rounded-lg border-2 bg-[#080808] transition-all duration-500 ${isSelected ? 'shadow-[0_0_30px_rgba(166,138,100,0.5)]' : 'shadow-lg'}`}
+        className={`w-full h-full relative rounded-md md:rounded-lg border-2 bg-[#080808] transition-all duration-500 
+          ${isSelected ? 'shadow-[0_0_30px_rgba(166,138,100,0.5)] card-holographic' : 'shadow-lg'}`}
         style={{
           borderColor: isSelected ? suitColors[card.suit] : `${suitColors[card.suit]}66`,
           boxShadow: `0 0 15px ${suitColors[card.suit]}11`

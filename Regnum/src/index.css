@@ -17,9 +17,20 @@
   --bg: #0c0c0e;
   --text: #e0e0e0;
   --panel-bg: #1e1e24;
+  --panel-secondary: #121214;
   --border: #3e3e4a;
   --gradient-start: rgba(30, 30, 36, 0.5);
   --overlay: rgba(12, 12, 14, 0.85);
+  /* Text shades */
+  --text-muted: #6b7280;    /* gray-500 equivalent */
+  --text-secondary: #9ca3af; /* gray-400 equivalent */
+  /* Modal / surface colors */
+  --modal-bg: #0f0f12;
+  --modal-backdrop: rgba(0, 0, 0, 0.85);
+  --surface-card: rgba(255,255,255,0.03);
+  --surface-hover: rgba(255,255,255,0.07);
+  /* Stat icon backgrounds */
+  --icon-bg: rgba(0,0,0,0.4);
 }
 
 :root.light {
@@ -27,9 +38,20 @@
   --bg: #f4ece1;
   --text: #2d2a26;
   --panel-bg: #e8dfd1;
-  --border: #d1c5b4;
+  --panel-secondary: #ddd3c4;
+  --border: #c4b49e;
   --gradient-start: rgba(210, 190, 160, 0.3);
   --overlay: rgba(244, 236, 225, 0.6);
+  /* Text shades */
+  --text-muted: #6b5c44;
+  --text-secondary: #5c4e3c;
+  /* Modal / surface colors */
+  --modal-bg: #f0e8dc;
+  --modal-backdrop: rgba(180, 160, 130, 0.6);
+  --surface-card: rgba(0,0,0,0.04);
+  --surface-hover: rgba(0,0,0,0.07);
+  /* Stat icon backgrounds */
+  --icon-bg: rgba(0,0,0,0.08);
 }
 
 @layer base {
@@ -55,6 +77,26 @@
     linear-gradient(var(--overlay), var(--overlay)) !important;
   background-blend-mode: normal;
 }
+
+/* === THEME-AWARE UTILITIES === */
+
+/* Modal backgrounds */
+.bg-modal { background-color: var(--modal-bg); }
+.bg-modal-backdrop { background-color: var(--modal-backdrop); }
+
+/* Text variants */
+.text-muted { color: var(--text-muted); }
+.text-secondary-theme { color: var(--text-secondary); }
+
+/* Surface colors (cards, rows) */
+.bg-surface { background-color: var(--surface-card); }
+.hover\:bg-surface-hover:hover { background-color: var(--surface-hover); }
+
+/* Icon container */
+.bg-icon { background-color: var(--icon-bg); }
+
+/* Panel secondary */
+.bg-panel-secondary { background-color: var(--panel-secondary); }
 
 .text-gold-gradient {
   background: linear-gradient(to bottom, #d4bb92 0%, var(--gold) 50%, #7a6345 100%);
@@ -84,3 +126,63 @@
 .animate-fade-in-up {
   animation: fadeInUp 1s ease-out both;
 }
+
+/* Holographic Effect */
+.card-holographic::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(255, 255, 255, 0.4) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+  background-size: 200% 200%;
+  animation: hologram 1.2s ease-out forwards;
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0;
+}
+
+.card-holographic {
+  perspective: 1000px;
+  transform-style: preserve-3d;
+}
+
+@keyframes hologram {
+  0% { background-position: -200% 0; opacity: 0; }
+  20% { opacity: 1; }
+  100% { background-position: 200% 0; opacity: 0; }
+}
+
+/* Custom Scrollbar Premium */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(166, 138, 100, 0.05);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, #d4bb92, #a68a64);
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #d4bb92;
+  box-shadow: 0 0 10px rgba(166, 138, 100, 0.4);
+}
+
+/* Firefox */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #a68a64 rgba(166, 138, 100, 0.05);
+}
+
+

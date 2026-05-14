@@ -17,7 +17,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-modal-backdrop backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -34,7 +34,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
           </button>
 
           <motion.div
-            className="w-full max-w-2xl bg-bg-dark border border-accent-gray relative overflow-hidden"
+            className="w-full max-w-2xl bg-modal border border-accent-gray relative overflow-hidden"
             initial={{ scale: 0.9, y: 20, opacity: 0 }}
             animate={{ scale: 1, y: 0, opacity: 1 }}
             exit={{ scale: 0.9, y: 20, opacity: 0 }}
@@ -52,7 +52,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
               <div className="space-y-10 font-spectral">
                 {/* Audio Section */}
                 <section>
-                  <h3 className="text-xs uppercase tracking-[0.3em] text-gray-500 mb-6 border-b border-accent-gray pb-2">Audio</h3>
+                  <h3 className="text-xs uppercase tracking-[0.3em] text-muted mb-6 border-b border-accent-gray pb-2">Audio</h3>
                   <div className="space-y-6">
                     <div className="flex items-center justify-between gap-8">
                       <span className="text-sm text-gray-400">Volumen General</span>
@@ -85,7 +85,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
 
                 {/* Graphics Section */}
                 <section>
-                  <h3 className="text-xs uppercase tracking-[0.3em] text-gray-500 mb-6 border-b border-accent-gray pb-2">Gráficos</h3>
+                  <h3 className="text-xs uppercase tracking-[0.3em] text-muted mb-6 border-b border-accent-gray pb-2">Gráficos</h3>
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-400">Calidad de Animaciones</span>
@@ -107,7 +107,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
 
                 {/* Game Section */}
                 <section>
-                  <h3 className="text-xs uppercase tracking-[0.3em] text-gray-500 mb-6 border-b border-accent-gray pb-2">Juego</h3>
+                  <h3 className="text-xs uppercase tracking-[0.3em] text-muted mb-6 border-b border-accent-gray pb-2">Juego</h3>
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-400">Mostrar Consejos</span>
@@ -133,7 +133,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                 <button className="flex-1 bg-primary-gold text-bg-dark py-4 font-cinzel text-sm uppercase tracking-widest font-bold hover:bg-[#c4a47a] transition-all shadow-[0_0_15px_rgba(166,138,100,0.3)]">
                   Guardar Cambios
                 </button>
-                <button className="flex-1 border border-accent-gray text-gray-400 py-4 font-cinzel text-sm uppercase tracking-widest hover:border-primary-gold hover:text-white transition-all">
+                <button className="flex-1 border border-accent-gray text-secondary-theme py-4 font-cinzel text-sm uppercase tracking-widest hover:border-primary-gold hover:text-text-main transition-all">
                   Restaurar Predeterminados
                 </button>
               </div>
