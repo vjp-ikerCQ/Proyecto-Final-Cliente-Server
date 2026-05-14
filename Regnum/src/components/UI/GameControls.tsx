@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Volume2, VolumeX, Sun, Moon } from 'lucide-react';
+import LanguageSelector from './LanguageSelector';
 
 /**
- * Componente que gestiona los controles globales del juego (Sonido y Tema).
+ * Componente que gestiona los controles globales del juego (Sonido, Tema, Idioma).
  * Utiliza localStorage para persistir las preferencias del usuario.
  */
 const GameControls: React.FC = () => {
@@ -58,8 +59,12 @@ const GameControls: React.FC = () => {
       >
         {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
       </button>
+
+      {/* Selector de Idioma */}
+      <LanguageSelector />
     </div>
   );
 };
 
 export default GameControls;
+

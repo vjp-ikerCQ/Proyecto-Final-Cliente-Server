@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sword,
@@ -43,6 +44,7 @@ const CornerDecoration = () => (
  * Componente principal del Menú de Inicio
  */
 const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
+  const { t } = useTranslation();
   // Estados para controlar la visibilidad de los modales
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
@@ -52,11 +54,11 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
 
   // Definición de las opciones del menú principal
   const menuItems = [
-    { id: 'new-game', text: 'Nueva Partida', icon: <Sword size={20} />, primary: true },
-    { id: 'rankings', text: 'Rankings', icon: <Trophy size={20} />, primary: false },
-    { id: 'gallery', text: 'Galería de Cartas', icon: <BookOpen size={20} />, primary: false },
-    { id: 'settings', text: 'Ajustes', icon: <Settings size={20} />, primary: false },
-    { id: 'exit', text: 'Salir', icon: <LogOut size={20} />, primary: false },
+    { id: 'new-game', text: t('menu.newGame'), icon: <Sword size={20} />, primary: true },
+    { id: 'rankings', text: t('menu.rankings'), icon: <Trophy size={20} />, primary: false },
+    { id: 'gallery', text: t('menu.gallery'), icon: <BookOpen size={20} />, primary: false },
+    { id: 'settings', text: t('menu.settings'), icon: <Settings size={20} />, primary: false },
+    { id: 'exit', text: t('menu.exit'), icon: <LogOut size={20} />, primary: false },
   ];
 
   /**
@@ -116,7 +118,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
         <div className="flex items-center justify-center gap-2 md:gap-6">
           <div className="h-px w-6 md:w-20 bg-gradient-to-r from-transparent via-accent-gray to-transparent" />
           <span className="text-[8px] md:text-sm tracking-widest uppercase font-cinzel text-gray-400">
-            Bienvenido, {user.name}
+            {t('menu.welcome')}, {user.name}
           </span>
           <div className="h-px w-6 md:w-20 bg-gradient-to-r from-transparent via-accent-gray to-transparent" />
         </div>

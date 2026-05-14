@@ -1,0 +1,118 @@
+{
+  "splash": {
+    "enter": "Click to enter the kingdom",
+    "subtitle": "In Manus Fatum"
+  },
+  "login": {
+    "title": "Enter the Kingdom",
+    "subtitle": "Voluntas Vincit",
+    "username": "Knight's Name",
+    "password": "Password",
+    "usernamePlaceholder": "Your name...",
+    "passwordPlaceholder": "••••••••",
+    "submit": "Enter the Kingdom",
+    "loading": "Consulting the Oracle...",
+    "guest": "Guest",
+    "register": "New here?",
+    "registerLink": "Sign Up",
+    "error_empty": "Please enter your name and password",
+    "error_server": "Could not connect to the server",
+    "divider": "or"
+  },
+  "menu": {
+    "newGame": "New Game",
+    "rankings": "Rankings",
+    "gallery": "Card Gallery",
+    "settings": "Settings",
+    "exit": "Exit",
+    "subtitle": "Voluntas Vincit",
+    "welcome": "Welcome"
+  },
+  "gallery": {
+    "title": "Card Gallery",
+    "subtitle": "The complete Regnum collection",
+    "back": "Back",
+    "close": "Close View",
+    "attack": "Attack Points",
+    "health": "Health Points",
+    "tabs": {
+      "all": "ALL",
+      "espadas": "SWORDS",
+      "copas": "CUPS",
+      "oros": "COINS",
+      "bastos": "CLUBS",
+      "jokers": "JOKERS"
+    }
+  },
+  "game": {
+    "will": "Will",
+    "hp": "HP",
+    "mana": "Mana",
+    "board": "Board",
+    "hand": "Your Hand",
+    "opponent": "Opponent",
+    "endTurn": "End Turn",
+    "surrender": "Surrender",
+    "confirmSurrender": "Are you sure you want to surrender?",
+    "yes": "Yes, surrender",
+    "no": "No, keep playing",
+    "close": "Close"
+  },
+  "settings": {
+    "title": "Settings",
+    "back": "Back",
+    "audio": "Audio",
+    "graphics": "Graphics",
+    "game": "Game",
+    "volume": "Master Volume",
+    "soundEffects": "Sound Effects",
+    "music": "Music",
+    "animQuality": "Animation Quality",
+    "particles": "Particle Effects",
+    "showTips": "Show Tips",
+    "animSpeed": "Animation Speed",
+    "save": "Save Changes",
+    "reset": "Restore Defaults",
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "slow": "Slow",
+    "normal": "Normal",
+    "fast": "Fast"
+  },
+  "stats": {
+    "title": "Statistics",
+    "subtitle": "Kingdom Record for",
+    "loading": "Consulting real records...",
+    "played": "Games Played",
+    "won": "Games Won",
+    "lost": "Games Lost",
+    "winRate": "Win Rate",
+    "playTime": "Play Time",
+    "deleteAccount": "Delete Account",
+    "rank": "Throne Aspirant",
+    "guestWarning": "You must have a registered account to view and save your statistics on the royal scroll."
+  },
+  "rankings": {
+    "title": "Rankings",
+    "subtitle": "The Masters of the Kingdom",
+    "loading": "Consulting Scrolls...",
+    "wins": "Wins",
+    "quote": "\"Only the most worthy will endure in the annals of history\""
+  },
+  "controls": {
+    "music": "Toggle Music",
+    "theme": "Toggle Mode",
+    "language": "Language"
+  },
+  "register": {
+    "title": "Create Account",
+    "username": "Knight's Name",
+    "password": "Password",
+    "submit": "Create Account",
+    "loading": "Forging your legend...",
+    "cancel": "Cancel",
+    "success": "Account created successfully"
+  },
+  "footer": "DAW - 2026 • Four suits. One kingdom."
+}

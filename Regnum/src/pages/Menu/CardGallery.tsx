@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, X } from 'lucide-react';
+import { ArrowLeft, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useEffect, useCallback } from 'react';
 import { allCards, type CardData } from '../../utils/cardData';
 
 /**
@@ -81,6 +82,32 @@ const CardGallery: React.FC = () => {
   const filteredCards = activeTab === 'TODAS' 
     ? allCards 
     : allCards.filter(card => card.suit === activeTab.toLowerCase());
+
+  const handlePrev = useCallback(() => {
+    if (!selectedCard) return;
+    const currentIndex = filteredCards.findIndex(c => c.id === selectedCard.id);
+    const prevIndex = (currentIndex - 1 + filteredCards.length) % filteredCards.length;
+    setSelectedCard(filteredCards[prevIndex]);
+  }, [selectedCard, filteredCards]);
+
+  const handleNext = useCallback(() => {
+    if (!selectedCard) return;
+    const currentIndex = filteredCards.findIndex(c => c.id === selectedCard.id);
+    const nextIndex = (currentIndex + 1) % filteredCards.length;
+    setSelectedCard(filteredCards[nextIndex]);
+  }, [selectedCard, filteredCards]);
+
+  // Soporte para teclado
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!selectedCard) return;
+      if (e.key === 'ArrowLeft') handlePrev();
+      if (e.key === 'ArrowRight') handleNext();
+      if (e.key === 'Escape') setSelectedCard(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedCard, handlePrev, handleNext]);
 
   return (
     <div className="min-h-screen bg-bg-main text-text-main p-8 font-cinzel relative overflow-y-auto">
@@ -188,16 +215,31 @@ const CardGallery: React.FC = () => {
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="max-w-5xl w-full flex flex-col md:flex-row gap-8 md:gap-16 items-center md:items-start" 
+              className="max-w-6xl w-full flex flex-col md:flex-row gap-8 md:gap-16 items-center md:items-start relative group/modal" 
               onClick={e => e.stopPropagation()}
             >
+              {/* Botones de Navegación Lateral (Escritorio) */}
+              <button 
+                onClick={(e) => { e.stopPropagation(); handlePrev(); }}
+                className="absolute -left-12 lg:-left-20 top-1/2 -translate-y-1/2 p-4 text-muted hover:text-primary-gold transition-all hidden md:block group/btn"
+              >
+                <ChevronLeft size={48} className="group-hover/btn:-translate-x-1 transition-transform" />
+              </button>
+
+              <button 
+                onClick={(e) => { e.stopPropagation(); handleNext(); }}
+                className="absolute -right-12 lg:-right-20 top-1/2 -translate-y-1/2 p-4 text-muted hover:text-primary-gold transition-all hidden md:block group/btn"
+              >
+                <ChevronRight size={48} className="group-hover/btn:translate-x-1 transition-transform" />
+              </button>
+
               {/* Carta en Grande - Ajuste fino de escala (-10px adicionales) */}
               <div className="w-full max-w-[235px] sm:max-w-[335px] md:max-w-[405px] lg:max-w-[465px] aspect-[2/3] relative shrink-0">
                 <div 
                   className="w-full h-full rounded-2xl md:rounded-[2.5rem] overflow-hidden shadow-2xl relative border-2 card-holographic"
                   style={{ borderColor: `${suitColors[selectedCard.suit]}44` }}
                 >
-                  <img src={selectedCard.image} className="w-full h-full object-cover bg-black" alt={selectedCard.name} />
+                  <img src={selectedCard.image} key={selectedCard.id} className="w-full h-full object-cover bg-black animate-fade-in" alt={selectedCard.name} />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60" />
                 </div>
               </div>
@@ -230,6 +272,16 @@ const CardGallery: React.FC = () => {
                    <p className="text-lg md:text-3xl text-secondary-theme font-light italic leading-relaxed md:pl-4">
                       "{selectedCard.effect}"
                    </p>
+                </div>
+
+                {/* Botones de Navegación (Móvil) */}
+                <div className="flex md:hidden items-center justify-center gap-8 pt-4">
+                  <button onClick={handlePrev} className="p-4 bg-surface border border-accent-gray/20 rounded-full text-primary-gold active:bg-primary-gold active:text-bg-main">
+                    <ChevronLeft size={24} />
+                  </button>
+                  <button onClick={handleNext} className="p-4 bg-surface border border-accent-gray/20 rounded-full text-primary-gold active:bg-primary-gold active:text-bg-main">
+                    <ChevronRight size={24} />
+                  </button>
                 </div>
 
                 <button 

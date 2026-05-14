@@ -1,0 +1,118 @@
+{
+  "splash": {
+    "enter": "Clique para entrar no reino",
+    "subtitle": "In Manus Fatum"
+  },
+  "login": {
+    "title": "Entrar no Reino",
+    "subtitle": "Voluntas Vincit",
+    "username": "Nome do Cavaleiro",
+    "password": "Senha",
+    "usernamePlaceholder": "Seu nome...",
+    "passwordPlaceholder": "••••••••",
+    "submit": "Entrar no Reino",
+    "loading": "Consultando o Oráculo...",
+    "guest": "Convidado",
+    "register": "É novo aqui?",
+    "registerLink": "Cadastre-se",
+    "error_empty": "Por favor, insira nome e senha",
+    "error_server": "Não foi possível conectar ao servidor",
+    "divider": "ou"
+  },
+  "menu": {
+    "newGame": "Nova Partida",
+    "rankings": "Rankings",
+    "gallery": "Galeria de Cartas",
+    "settings": "Configurações",
+    "exit": "Sair",
+    "subtitle": "Voluntas Vincit",
+    "welcome": "Bem-vindo"
+  },
+  "gallery": {
+    "title": "Galeria de Cartas",
+    "subtitle": "A coleção completa de Regnum",
+    "back": "Voltar",
+    "close": "Fechar Visualização",
+    "attack": "Pontos de Ataque",
+    "health": "Pontos de Vida",
+    "tabs": {
+      "all": "TODAS",
+      "espadas": "ESPADAS",
+      "copas": "COPAS",
+      "oros": "OUROS",
+      "bastos": "PAUS",
+      "jokers": "JOKERS"
+    }
+  },
+  "game": {
+    "will": "Vontade",
+    "hp": "Vida",
+    "mana": "Mana",
+    "board": "Tabuleiro",
+    "hand": "Sua Mão",
+    "opponent": "Rival",
+    "endTurn": "Fim de Turno",
+    "surrender": "Render-se",
+    "confirmSurrender": "Tem certeza que deseja se render?",
+    "yes": "Sim, render-se",
+    "no": "Não, continuar",
+    "close": "Fechar"
+  },
+  "settings": {
+    "title": "Configurações",
+    "back": "Voltar",
+    "audio": "Áudio",
+    "graphics": "Gráficos",
+    "game": "Jogo",
+    "volume": "Volume Geral",
+    "soundEffects": "Efeitos Sonoros",
+    "music": "Música",
+    "animQuality": "Qualidade de Animações",
+    "particles": "Efeitos de Partículas",
+    "showTips": "Mostrar Dicas",
+    "animSpeed": "Velocidade de Animações",
+    "save": "Salvar Alterações",
+    "reset": "Restaurar Padrões",
+    "low": "Baixa",
+    "medium": "Média",
+    "high": "Alta",
+    "slow": "Lenta",
+    "normal": "Normal",
+    "fast": "Rápida"
+  },
+  "stats": {
+    "title": "Estatísticas",
+    "subtitle": "Registro do Reino para",
+    "loading": "Consultando registros reais...",
+    "played": "Partidas Jogadas",
+    "won": "Partidas Ganhas",
+    "lost": "Partidas Perdidas",
+    "winRate": "Taxa de Vitória",
+    "playTime": "Tempo de Jogo",
+    "deleteAccount": "Excluir Conta",
+    "rank": "Aspirante ao Trono",
+    "guestWarning": "Você deve ter uma conta registrada para visualizar e salvar suas estatísticas no pergaminho real."
+  },
+  "rankings": {
+    "title": "Rankings",
+    "subtitle": "Os Mestres do Reino",
+    "loading": "Consultando Pergaminhos...",
+    "wins": "Vitórias",
+    "quote": "\"Somente os mais dignos perdurarão nos anais da história\""
+  },
+  "controls": {
+    "music": "Alternar Música",
+    "theme": "Alternar Modo",
+    "language": "Idioma"
+  },
+  "register": {
+    "title": "Criar Conta",
+    "username": "Nome do Cavaleiro",
+    "password": "Senha",
+    "submit": "Criar Conta",
+    "loading": "Forjando sua lenda...",
+    "cancel": "Cancelar",
+    "success": "Conta criada com sucesso"
+  },
+  "footer": "DAW - 2026 • Quatro naipes. Um só reino."
+}

@@ -1,0 +1,118 @@
+{
+  "splash": {
+    "enter": "Haz clic para entrar al reino",
+    "subtitle": "In Manus Fatum"
+  },
+  "login": {
+    "title": "Entrar al Reino",
+    "subtitle": "Voluntas Vincit",
+    "username": "Nombre de Caballero",
+    "password": "Contraseña",
+    "usernamePlaceholder": "Tu nombre...",
+    "passwordPlaceholder": "••••••••",
+    "submit": "Entrar al Reino",
+    "loading": "Consultando Oráculo...",
+    "guest": "Invitado",
+    "register": "¿Eres nuevo?",
+    "registerLink": "Regístrate",
+    "error_empty": "Por favor, introduce nombre y contraseña",
+    "error_server": "No se pudo conectar con el servidor",
+    "divider": "o"
+  },
+  "menu": {
+    "newGame": "Nueva Partida",
+    "rankings": "Rankings",
+    "gallery": "Galería de Cartas",
+    "settings": "Ajustes",
+    "exit": "Salir",
+    "subtitle": "Voluntas Vincit",
+    "welcome": "Bienvenido"
+  },
+  "gallery": {
+    "title": "Galería de Cartas",
+    "subtitle": "La colección completa de Regnum",
+    "back": "Volver",
+    "close": "Cerrar Visualización",
+    "attack": "Puntos de Ataque",
+    "health": "Puntos de Vida",
+    "tabs": {
+      "all": "TODAS",
+      "espadas": "ESPADAS",
+      "copas": "COPAS",
+      "oros": "OROS",
+      "bastos": "BASTOS",
+      "jokers": "JOKERS"
+    }
+  },
+  "game": {
+    "will": "Voluntad",
+    "hp": "Vida",
+    "mana": "Maná",
+    "board": "Tablero",
+    "hand": "Tu Mano",
+    "opponent": "Rival",
+    "endTurn": "Fin de Turno",
+    "surrender": "Rendirse",
+    "confirmSurrender": "¿Seguro que quieres rendirte?",
+    "yes": "Sí, rendirse",
+    "no": "No, seguir",
+    "close": "Cerrar"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "back": "Volver",
+    "audio": "Audio",
+    "graphics": "Gráficos",
+    "game": "Juego",
+    "volume": "Volumen General",
+    "soundEffects": "Efectos de Sonido",
+    "music": "Música",
+    "animQuality": "Calidad de Animaciones",
+    "particles": "Efectos de Partículas",
+    "showTips": "Mostrar Consejos",
+    "animSpeed": "Velocidad de Animaciones",
+    "save": "Guardar Cambios",
+    "reset": "Restaurar Predeterminados",
+    "low": "Baja",
+    "medium": "Media",
+    "high": "Alta",
+    "slow": "Lenta",
+    "normal": "Normal",
+    "fast": "Rápida"
+  },
+  "stats": {
+    "title": "Estadísticas",
+    "subtitle": "Registro del Reino para",
+    "loading": "Consultando registros reales...",
+    "played": "Partidas Jugadas",
+    "won": "Partidas Ganadas",
+    "lost": "Partidas Perdidas",
+    "winRate": "Tasa de Victoria",
+    "playTime": "Tiempo de Juego",
+    "deleteAccount": "Eliminar Cuenta",
+    "rank": "Aspirante al Trono",
+    "guestWarning": "Debes tener una cuenta registrada para poder ver y guardar tus estadísticas en el pergamino real."
+  },
+  "rankings": {
+    "title": "Rankings",
+    "subtitle": "Los Maestros del Reino",
+    "loading": "Consultando Pergaminos...",
+    "wins": "Victorias",
+    "quote": "\"Solo los más dignos perdurarán en los anales de la historia\""
+  },
+  "controls": {
+    "music": "Alternar Música",
+    "theme": "Alternar Modo",
+    "language": "Idioma"
+  },
+  "register": {
+    "title": "Crear Cuenta",
+    "username": "Nombre de Caballero",
+    "password": "Contraseña",
+    "submit": "Crear Cuenta",
+    "loading": "Forjando tu leyenda...",
+    "cancel": "Cancelar",
+    "success": "Cuenta creada con éxito"
+  },
+  "footer": "DAW - 2026 • Cuatro palos. Un solo reino."
+}

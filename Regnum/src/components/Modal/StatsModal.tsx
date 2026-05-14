@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { X, BarChart2, Shield, Sword, Skull, Clock, Trash2 } from 'lucide-react';
 import type { UserStats } from '../../types/index';
 import { getUserStats } from '../../services/userService';
@@ -18,28 +19,31 @@ interface StatsModalProps {
  * Modal que muestra las estadísticas del jugador actual.
  */
 const StatsModal: React.FC<StatsModalProps> = ({ isOpen, onClose, user }) => {
+  const { t } = useTranslation();
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   // Carga las estadísticas cuando el modal se abre
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !user.isGuest) {
       setIsLoading(true);
       getUserStats(user.name).then(data => {
         setUserStats(data);
         setIsLoading(false);
       });
+    } else if (isOpen && user.isGuest) {
+      setIsLoading(false);
     }
-  }, [isOpen, user.name]);
+  }, [isOpen, user.name, user.isGuest]);
 
   // Si no hay datos todavía, preparamos una lista vacía para el mapeo
   const statsList = userStats ? [
-    { label: 'Partidas Jugadas', value: userStats.gamesPlayed.toString(), icon: <BarChart2 className="text-blue-400" size={24} /> },
-    { label: 'Partidas Ganadas', value: userStats.gamesWon.toString(), icon: <Sword className="text-green-400" size={24} /> },
-    { label: 'Partidas Perdidas', value: userStats.gamesLost.toString(), icon: <Skull className="text-red-400" size={24} /> },
-    { label: 'Tasa de Victoria', value: userStats.winRate, icon: <Shield className="text-yellow-400" size={24} /> },
-    { label: 'Tiempo de Juego', value: userStats.playTime, icon: <Clock className="text-purple-400" size={24} /> },
+    { label: t('stats.played'), value: userStats.gamesPlayed.toString(), icon: <BarChart2 className="text-blue-400" size={24} /> },
+    { label: t('stats.won'), value: userStats.gamesWon.toString(), icon: <Sword className="text-green-400" size={24} /> },
+    { label: t('stats.lost'), value: userStats.gamesLost.toString(), icon: <Skull className="text-red-400" size={24} /> },
+    { label: t('stats.winRate'), value: userStats.winRate, icon: <Shield className="text-yellow-400" size={24} /> },
+    { label: t('stats.playTime'), value: userStats.playTime, icon: <Clock className="text-purple-400" size={24} /> },
   ] : [];
 
   return (
@@ -74,7 +78,7 @@ const StatsModal: React.FC<StatsModalProps> = ({ isOpen, onClose, user }) => {
                 <div className="flex items-center gap-3">
                   <BarChart2 className="text-primary-gold" size={28} />
                   <h2 className="text-3xl font-black tracking-widest uppercase font-cinzel text-gold-gradient">
-                    Estadísticas
+                    {t('stats.title')}
                   </h2>
                 </div>
                 <button
@@ -86,14 +90,23 @@ const StatsModal: React.FC<StatsModalProps> = ({ isOpen, onClose, user }) => {
               </div>
 
               <p className="mb-8 text-secondary-theme font-spectral italic text-lg border-b border-accent-gray/30 pb-4">
-                Registro del Reino para <span className="text-primary-gold not-italic font-bold">{user.name}</span>
+                {t('stats.subtitle')} <span className="text-primary-gold not-italic font-bold">{user.name}</span>
               </p>
 
-              {/* Cuadrícula de Estadísticas */}
+              {/* Cuadrícula de Estadísticas o Advertencia de Invitado */}
               <div className="grid grid-cols-1 gap-4 mb-8">
-                {isLoading ? (
+                {user.isGuest ? (
+                  <div className="py-12 px-6 text-center border border-primary-gold/10 bg-primary-gold/5 rounded-sm">
+                    <div className="inline-flex p-4 bg-primary-gold/10 rounded-full mb-4">
+                      <Shield className="text-primary-gold" size={40} />
+                    </div>
+                    <p className="text-secondary-theme font-spectral text-lg leading-relaxed italic">
+                      "{t('stats.guestWarning')}"
+                    </p>
+                  </div>
+                ) : isLoading ? (
                   <div className="py-20 text-center text-primary-gold/50 font-cinzel animate-pulse">
-                    Consultando registros reales...
+                    {t('stats.loading')}
                   </div>
                 ) : (
                   statsList.map((stat, index) => (
@@ -128,7 +141,7 @@ const StatsModal: React.FC<StatsModalProps> = ({ isOpen, onClose, user }) => {
                     className="flex items-center gap-2 px-6 py-2 border border-red-900/30 text-red-500/50 hover:bg-red-950/30 hover:text-red-500 hover:border-red-500 transition-all font-cinzel text-[10px] uppercase tracking-widest group"
                   >
                     <Trash2 size={14} className="group-hover:scale-110 transition-transform" />
-                    Eliminar Cuenta
+                    {t('stats.deleteAccount')}
                   </button>
                 </div>
               )}
