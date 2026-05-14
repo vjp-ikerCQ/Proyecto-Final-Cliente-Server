@@ -121,7 +121,66 @@ const register = async (req, res) => {
     }
 };
 
+const deleteAccount = async (req, res) => {
+    try {
+        const { nombre, password } = req.body;
+
+        if (!nombre || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Nombre y password son requeridos para eliminar la cuenta'
+            });
+        }
+
+        const db = getDB();
+
+        if (!db) {
+            console.error('Database not connected');
+            return res.status(503).json({
+                success: false,
+                message: 'El servidor no está conectado a la base de datos'
+            });
+        }
+
+        const usuario = await db.collection('usuarios').findOne({ nombre });
+
+        if (!usuario) {
+            return res.status(404).json({
+                success: false,
+                message: 'Usuario no encontrado'
+            });
+        }
+
+        // Verificar password antes de eliminar
+        const storedPassword = usuario.contrasena || usuario.contraseña || usuario.password;
+
+        if (storedPassword !== password) {
+            return res.status(401).json({
+                success: false,
+                message: 'Password incorrecta. No se puede eliminar la cuenta'
+            });
+        }
+
+        await db.collection('usuarios').deleteOne({ nombre });
+
+        console.log(`🗑️ Usuario eliminado: ${nombre}`);
+
+        return res.json({
+            success: true,
+            message: 'Cuenta eliminada correctamente'
+        });
+
+    } catch (error) {
+        console.error('💥 ERROR EN DELETE ACCOUNT:', error);
+        return res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     login,
-    register
+    register,
+    deleteAccount
 };
