@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { allCards, type CardData } from '../../utils/cardData';
+import { fetchAllCards } from '../../services/cardService';
 import AtmosphereParticles from '../../components/AtmosphereParticles';
 
 /**
@@ -34,6 +35,7 @@ const Game: React.FC = () => {
   const [voluntad, setVoluntad] = useState(10);
   const [hp, setHp] = useState(100);
   const [hand, setHand] = useState<CardData[]>([]);
+  const [deck, setDeck] = useState<CardData[]>([]);
   const [board, setBoard] = useState<BoardSlot[]>([
     { card: null, stack: [] },
     { card: null, stack: [] },
@@ -53,6 +55,7 @@ const Game: React.FC = () => {
   const [viewingCard, setViewingCard] = useState<CardData | null>(null);
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (voluntad < 5) {
@@ -62,19 +65,47 @@ const Game: React.FC = () => {
     }
   }, [voluntad]);
 
-  // Inicializar mano
+  // Inicializar mazo desde el backend y barajar
   useEffect(() => {
-    const initialHand = Array.from({ length: 3 }, () =>
-      allCards[Math.floor(Math.random() * allCards.length)]
-    );
-    setHand(initialHand);
+    const initializeGame = async () => {
+      setIsLoading(true);
+      try {
+        const allBackendCards = await fetchAllCards();
+        
+        // Barajar el mazo (Fisher-Yates Shuffle)
+        const shuffledDeck = [...allBackendCards];
+        for (let i = shuffledDeck.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffledDeck[i], shuffledDeck[j]] = [shuffledDeck[j], shuffledDeck[i]];
+        }
+
+        // Robar las primeras 3 cartas
+        const initialHand = shuffledDeck.slice(0, 3);
+        const remainingDeck = shuffledDeck.slice(3);
+
+        setHand(initialHand);
+        setDeck(remainingDeck);
+      } catch (error) {
+        console.error("Error inicializando el juego:", error);
+        // Fallback a cartas locales si el backend falla
+        const fallbackHand = Array.from({ length: 3 }, () =>
+          allCards[Math.floor(Math.random() * allCards.length)]
+        );
+        setHand(fallbackHand);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeGame();
   }, []);
 
-  // Función para robar carta
+  // Función para robar carta del mazo real
   const drawCard = () => {
-    if (voluntad >= 1 && hand.length < 5) {
-      const newCard = allCards[Math.floor(Math.random() * allCards.length)];
-      setHand([...hand, newCard]);
+    if (voluntad >= 1 && hand.length < 5 && deck.length > 0) {
+      const nextCard = deck[0];
+      setHand([...hand, nextCard]);
+      setDeck(deck.slice(1));
       setVoluntad(v => v - 1);
     }
   };
@@ -134,6 +165,24 @@ const Game: React.FC = () => {
 
       {/* HEADER */}
       <header className="relative z-20 p-1 md:p-2 lg:p-3 flex flex-col sm:flex-row justify-between items-center gap-1 md:gap-3 border-b border-white/5 bg-black/40 backdrop-blur-md shrink-0">
+      
+      {/* Pantalla de Carga del Duelo */}
+      <AnimatePresence>
+        {isLoading && (
+          <motion.div 
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center gap-6"
+          >
+            <motion.div 
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+              className="w-20 h-20 border-t-2 border-primary-gold rounded-full"
+            />
+            <h2 className="text-primary-gold font-cinzel tracking-[0.3em] uppercase text-xl animate-pulse">Preparando Mazo...</h2>
+          </motion.div>
+        )}
+      </AnimatePresence>
         <div className="flex justify-between w-full sm:w-auto items-center px-2">
           <button
             onClick={() => setShowSurrenderModal(true)}
