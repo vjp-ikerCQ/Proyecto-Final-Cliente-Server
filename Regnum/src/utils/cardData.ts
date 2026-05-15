@@ -132,7 +132,7 @@ const generateCards = (): CardData[] => {
         health: roleData.hp,
         attackType: roleData.atkType,
         effect: effect,
-        image: `/src/assets/images/cards/${suit}_${roleData.rank}.png`
+        image: `https://res.cloudinary.com/drvgncidb/image/upload/v1/Assets/Folders/Home/regnumhollow/Cards/${suit}_${roleData.rank}.png`
       });
     });
   });
@@ -166,7 +166,7 @@ const generateCards = (): CardData[] => {
         health: 0,
         attackType: 'ESPECIAL',
         effect: effect,
-        image: `/src/assets/images/cards/joker_${i}.png`
+        image: `https://res.cloudinary.com/drvgncidb/image/upload/v1/Assets/Folders/Home/regnumhollow/Cards/joker_${i}.png`
     });
   }
 
