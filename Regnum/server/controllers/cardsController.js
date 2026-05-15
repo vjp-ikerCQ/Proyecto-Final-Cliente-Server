@@ -37,11 +37,14 @@ const getCards = async (req, res) => {
             const paloFormateado = carta.palo ? carta.palo.toLowerCase() : 'desconocido';
             let imageUrl = '';
             
-            // Lógica para deducir la ruta de la imagen
-            if (paloFormateado === 'jokers' || paloFormateado === 'joker') {
-                imageUrl = `/src/assets/images/cards/joker_${carta.numero}.png`;
+            // Lógica para deducir la ruta de la imagen:
+            // Priorizamos la URL de Cloudinary guardada en la BD si existe.
+            if (carta.image && (carta.image.startsWith('http') || carta.image.startsWith('https'))) {
+                imageUrl = carta.image;
+            } else if (paloFormateado === 'jokers' || paloFormateado === 'joker') {
+                imageUrl = `https://res.cloudinary.com/drvgncidb/image/upload/v1/Assets/Folders/Home/regnumhollow/Cards/joker_${carta.numero}.png`;
             } else {
-                imageUrl = `/src/assets/images/cards/${paloFormateado}_${carta.numero}.png`;
+                imageUrl = `https://res.cloudinary.com/drvgncidb/image/upload/v1/Assets/Folders/Home/regnumhollow/Cards/${paloFormateado}_${carta.numero}.png`;
             }
 
             // Adaptamos las propiedades de la BD (español) a las que usa el frontend (inglés)
