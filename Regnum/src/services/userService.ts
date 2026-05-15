@@ -37,18 +37,25 @@ export const getUserStats = async (username: string): Promise<UserStats> => {
  * Obtiene la lista de los mejores jugadores para el ranking
  */
 export const getRankings = async (): Promise<RankingEntry[]> => {
-  await new Promise(resolve => setTimeout(resolve, 800));
+  try {
+    const response = await fetch('http://localhost:5000/api/leaderboard');
+    const data = await response.json();
 
-  return [
-    { id: '1', name: 'Rey Arturo', wins: 150, rank: 1 },
-    { id: '2', name: 'Lancelot', wins: 135, rank: 2 },
-    { id: '3', name: 'Morgana', wins: 120, rank: 3 },
-    { id: '4', name: 'Ginebra', wins: 95, rank: 4 },
-    { id: '5', name: 'Merlín', wins: 88, rank: 5 },
-    { id: '6', name: 'Gawain', wins: 72, rank: 6 },
-    { id: '7', name: 'Perceval', wins: 65, rank: 7 },
-    { id: '8', name: 'Mordred', wins: 50, rank: 8 },
-  ];
+    if (data.success) {
+      // Mapeamos los datos del backend al formato que espera el frontend
+      return data.leaderboard.map((user: any, index: number) => ({
+        id: user.nombre, // Usamos el nombre como ID si no hay uno único expuesto
+        name: user.nombre,
+        wins: user.estadisticas?.partidasGanadas || 0,
+        rank: index + 1
+      }));
+    }
+    
+    throw new Error(data.message || 'Error al obtener ranking');
+  } catch (error) {
+    console.error('Error fetching rankings:', error);
+    return [];
+  }
 };
 /**
  * Elimina la cuenta del usuario actual

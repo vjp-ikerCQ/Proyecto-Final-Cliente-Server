@@ -63,6 +63,48 @@ const getUserStats = async (req, res) => {
     }
 };
 
+const getLeaderboard = async (req, res) => {
+    try {
+        const db = getDB();
+        if (!db) {
+            console.error('Database not connected');
+            return res.status(503).json({
+                success: false,
+                message: 'El servidor no está conectado a la base de datos'
+            });
+        }
+
+        // Obtener usuarios ordenados por partidas ganadas
+        // Solo proyectamos nombre y estadísticas por seguridad (no enviar emails ni contraseñas)
+        const leaderboard = await db.collection('usuarios')
+            .find({
+                estadisticas: { $exists: true }
+            }, {
+                projection: {
+                    nombre: 1,
+                    estadisticas: 1,
+                    _id: 0
+                }
+            })
+            .sort({ "estadisticas.partidasGanadas": -1 })
+            .limit(10) // Limitamos a los 10 mejores
+            .toArray();
+
+        return res.json({
+            success: true,
+            leaderboard
+        });
+
+    } catch (error) {
+        console.error("💥 ERROR EN GET LEADERBOARD:", error);
+        return res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
-    getUserStats
+    getUserStats,
+    getLeaderboard
 };

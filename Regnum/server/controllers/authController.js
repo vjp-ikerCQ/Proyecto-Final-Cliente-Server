@@ -102,7 +102,13 @@ const register = async (req, res) => {
             nombre,
             email,
             contrasena: password, // se guarda como contrasena en DB
-            createdAt: new Date()
+            createdAt: new Date(),
+            estadisticas: {
+                partidasJugadas: 0,
+                partidasGanadas: 0,
+                partidasPerdidas: 0,
+                tiempoJugado: 0
+            }
         };
 
         await db.collection('usuarios').insertOne(nuevoUsuario);
