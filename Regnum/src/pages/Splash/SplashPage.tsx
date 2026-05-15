@@ -1,11 +1,14 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { useSettings } from '../../contexts/SettingsContext';
 
 const SplashPage: React.FC = () => {
   const navigate = useNavigate();
+  const { playMusic } = useSettings();
 
   const handleStart = () => {
+    playMusic('/audio/menu.mp3');
     navigate('/login');
   };
 

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Globe } from 'lucide-react';
 
 const LANGUAGES = [
   { code: 'es', label: 'Español', flag: '🇪🇸' },
@@ -41,17 +41,10 @@ const LanguageSelector: React.FC = () => {
       {/* Botón principal */}
       <button
         onClick={() => setIsOpen(prev => !prev)}
-        className="p-3 border border-accent-gray bg-panel/50 text-primary-gold hover:bg-primary-gold hover:text-bg-main transition-all duration-300 rounded-sm flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,0,0,0.5)]"
+        className="p-3 border border-accent-gray bg-panel/50 text-primary-gold hover:bg-primary-gold hover:text-bg-main transition-all duration-300 rounded-sm flex items-center justify-center shadow-[0_0_15px_rgba(0,0,0,0.5)]"
         title={t('controls.language')}
       >
-        <span className="text-base leading-none">{current.flag}</span>
-        <span className="font-cinzel text-[10px] uppercase tracking-widest hidden sm:inline">
-          {current.code.toUpperCase()}
-        </span>
-        <ChevronDown
-          size={12}
-          className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-        />
+        <Globe size={20} />
       </button>
 
       {/* Dropdown */}

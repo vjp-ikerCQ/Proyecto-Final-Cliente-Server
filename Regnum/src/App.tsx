@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import LoginPage from './pages/Login/LoginPage';
 import MainMenu from './pages/Menu/MainMenu';
 import SplashPage from './pages/Splash/SplashPage';
+import { SettingsProvider } from './contexts/SettingsContext';
 
 import { testMongoConnection } from './services/mongotest';
 
@@ -28,50 +29,52 @@ function App() {
   const [user, setUser] = useState<{ name: string; isGuest: boolean } | null>(null);
 
   return (
-    <Router>
-      <InitialRedirect />
-      <div className="app bg-black min-h-screen">
-        <Routes>
-          {/* Splash Route - Entry Point */}
-          <Route path="/" element={<SplashPage />} />
+    <SettingsProvider>
+      <Router>
+        <InitialRedirect />
+        <div className="app bg-black min-h-screen">
+          <Routes>
+            {/* Splash Route - Entry Point */}
+            <Route path="/" element={<SplashPage />} />
 
-          {/* Login Route */}
-          <Route 
-            path="/login" 
-            element={
-              user ? <Navigate to="/menu" /> : <LoginPage onLogin={(name, isGuest) => setUser({ name, isGuest })} />
-            } 
-          />
+            {/* Login Route */}
+            <Route 
+              path="/login" 
+              element={
+                user ? <Navigate to="/menu" /> : <LoginPage onLogin={(name, isGuest) => setUser({ name, isGuest })} />
+              } 
+            />
 
-          {/* Menu Route */}
-          <Route 
-            path="/menu" 
-            element={
-              user ? <MainMenu user={user} /> : <Navigate to="/" />
-            } 
-          />
+            {/* Menu Route */}
+            <Route 
+              path="/menu" 
+              element={
+                user ? <MainMenu user={user} /> : <Navigate to="/" />
+              } 
+            />
 
-          {/* Gallery Route */}
-          <Route 
-            path="/gallery" 
-            element={
-              user ? <CardGallery /> : <Navigate to="/" />
-            } 
-          />
+            {/* Gallery Route */}
+            <Route 
+              path="/gallery" 
+              element={
+                user ? <CardGallery /> : <Navigate to="/" />
+              } 
+            />
 
-          {/* Game Route */}
-          <Route 
-            path="/game" 
-            element={
-              user ? <Game /> : <Navigate to="/" />
-            } 
-          />
+            {/* Game Route */}
+            <Route 
+              path="/game" 
+              element={
+                user ? <Game /> : <Navigate to="/" />
+              } 
+            />
 
-          {/* Default Redirect to Splash */}
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </div>
-    </Router>
+            {/* Default Redirect to Splash */}
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </div>
+      </Router>
+    </SettingsProvider>
   );
 }
 
