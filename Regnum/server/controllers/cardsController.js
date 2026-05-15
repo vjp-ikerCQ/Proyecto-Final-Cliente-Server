@@ -36,9 +36,11 @@ const getCards = async (req, res) => {
         const cartasFormateadas = cartas.map(carta => {
             const paloFormateado = carta.palo ? carta.palo.toLowerCase() : 'desconocido';
             let imageUrl = '';
-            
-            // Lógica para deducir la ruta de la imagen
-            if (paloFormateado === 'jokers' || paloFormateado === 'joker') {
+            // Lógica para deducir la ruta de la imagen:
+            // Priorizamos la URL de Cloudinary guardada en la BD si existe.
+            if (carta.image && (carta.image.startsWith('http') || carta.image.startsWith('https'))) {
+                imageUrl = carta.image;
+            } else if (paloFormateado === 'jokers' || paloFormateado === 'joker') {
                 imageUrl = `/src/assets/images/cards/joker_${carta.numero}.png`;
             } else {
                 imageUrl = `/src/assets/images/cards/${paloFormateado}_${carta.numero}.png`;
