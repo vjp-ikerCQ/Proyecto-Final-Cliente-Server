@@ -1,14 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Shield,
-  Swords,
-  Layers,
-  ArrowLeft
-} from 'lucide-react';
+import { Shield, Swords, Layers, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { allCards, type CardData } from '../../utils/cardData';
-import { fetchShuffledDeck } from '../../services/cardService';
+import { type CardData } from '../../utils/cardData';
+import { useGameState, type BoardSlot } from './hooks/useGameState';
+import { useBotAI } from './hooks/useBotAI';
 import AtmosphereParticles from '../../components/AtmosphereParticles';
 
 /**
@@ -22,45 +18,53 @@ const suitColors = {
   jokers: '#a855f7',
 };
 
-// Tipos para el estado del juego
-interface BoardSlot {
-  card: CardData | null;
-  stack: CardData[]; // Para la mecánica de escalera
-}
-
 const Game: React.FC = () => {
   const navigate = useNavigate();
 
-  // Estado del Jugador
-  const [voluntad, setVoluntad] = useState(10);
-  const [hp, setHp] = useState(100);
-  const [hand, setHand] = useState<CardData[]>([]);
-  const [deck, setDeck] = useState<CardData[]>([]); // Mazo compartido
-  const [board, setBoard] = useState<BoardSlot[]>([
-    { card: null, stack: [] },
-    { card: null, stack: [] },
-    { card: null, stack: [] }
-  ]);
+  // Custom Hooks para estado y bot
+  const gameState = useGameState();
+  const {
+    voluntad,
+    hp,
+    hand,
+    board,
+    opponentHp,
+    opponentVoluntad,
+    opponentHand,
+    opponentBoard,
+    deck,
+    isPlayerTurn,
+    isLoading,
+    drawCard,
+    playCard,
+    useJoker,
+    endTurn,
+    setOpponentHand,
+    setDeck,
+    setOpponentVoluntad,
+    setOpponentBoard
+  } = gameState;
 
-  // Estado de Turnos
-  const [isPlayerTurn, setIsPlayerTurn] = useState(true);
+  useBotAI({
+    isPlayerTurn,
+    isLoading,
+    opponentVoluntad,
+    opponentHand,
+    opponentBoard,
+    deck,
+    setOpponentHand,
+    setDeck,
+    setOpponentVoluntad,
+    setOpponentBoard,
+    endTurn
+  });
 
-  // Estado del Oponente (Simulado)
-  const [opponentHp, setOpponentHp] = useState(100);
-  const [opponentVoluntad, setOpponentVoluntad] = useState(10);
-  const [opponentHand, setOpponentHand] = useState<CardData[]>([]);
-  const [opponentBoard, setOpponentBoard] = useState<BoardSlot[]>([
-    { card: null, stack: [] },
-    { card: null, stack: [] },
-    { card: null, stack: [] }
-  ]);
-
-  // Gestión de selección
+  // Gestión de selección local de la UI
   const [selectedHandCardIndex, setSelectedHandCardIndex] = useState<number | null>(null);
+  const [selectedAttackerIndex, setSelectedAttackerIndex] = useState<number | null>(null);
   const [viewingCard, setViewingCard] = useState<CardData | null>(null);
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (voluntad < 5) {
@@ -70,151 +74,62 @@ const Game: React.FC = () => {
     }
   }, [voluntad]);
 
-  // Inicializar mazo desde el backend y barajar
-  useEffect(() => {
-    const initializeGame = async () => {
-      setIsLoading(true);
-      try {
-        // Pedimos un único mazo central barajado al backend
-        const sharedShuffledDeck = await fetchShuffledDeck();
-
-        // Repartir 3 cartas al jugador
-        const playerInitialHand = sharedShuffledDeck.slice(0, 3);
-        
-        // Repartir las siguientes 3 cartas al oponente
-        const opponentInitialHand = sharedShuffledDeck.slice(3, 6);
-        
-        // El resto de cartas forman el mazo central compartido
-        const remainingDeck = sharedShuffledDeck.slice(6);
-
-        setHand(playerInitialHand);
-        setOpponentHand(opponentInitialHand);
-        setDeck(remainingDeck);
-
-        // Para probar, vamos a poner la primera carta del oponente en su tablero
-        const initialOpponentBoard = [
-          { card: opponentInitialHand[0], stack: [opponentInitialHand[0]] },
-          { card: null, stack: [] },
-          { card: null, stack: [] }
-        ];
-        
-        // Removemos la carta jugada de la mano del oponente
-        setOpponentHand(opponentInitialHand.slice(1));
-        setOpponentBoard(initialOpponentBoard);
-
-      } catch (error) {
-        console.error("Error inicializando el juego:", error);
-        // Fallback a cartas locales si el backend falla
-        const fallbackHand = Array.from({ length: 3 }, () =>
-          allCards[Math.floor(Math.random() * allCards.length)]
-        );
-        setHand(fallbackHand);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initializeGame();
-  }, []);
-
-  // Lógica del Turno del Bot
-  useEffect(() => {
-    if (isPlayerTurn || isLoading) return;
-
-    const playBotTurn = async () => {
-      // 1. Pausa inicial para que se note que es el turno del bot
-      await new Promise(r => setTimeout(r, 1000));
-
-      let currentVoluntad = opponentVoluntad;
-      let currentDeck = [...deck];
-      let currentOpponentHand = [...opponentHand];
-
-      // 2. El bot roba cartas siempre que pueda
-      while (currentVoluntad >= 1 && currentOpponentHand.length < 5 && currentDeck.length > 0) {
-        await new Promise(r => setTimeout(r, 800)); // Pausa entre cada carta que roba
-        
-        const nextCard = currentDeck[0];
-        currentOpponentHand.push(nextCard);
-        currentDeck = currentDeck.slice(1);
-        currentVoluntad -= 1;
-
-        // Actualizamos estado visualmente paso a paso
-        setOpponentHand([...currentOpponentHand]);
-        setDeck([...currentDeck]);
-        setOpponentVoluntad(currentVoluntad);
-      }
-
-      // 3. Pequeña pausa antes de terminar turno
-      await new Promise(r => setTimeout(r, 1000));
-
-      // 4. Terminar turno del bot
-      setOpponentVoluntad(v => Math.min(v + 2, 10));
-      if (opponentBoard.filter(s => s.card).length === 0) {
-        setOpponentHp(prev => Math.max(0, prev - 10));
-      }
-      setIsPlayerTurn(true);
-    };
-
-    playBotTurn();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlayerTurn, isLoading]); // Solo dependemos de estos para que no se re-ejecute en bucle
-
-  // Función para robar carta del mazo real
-  const drawCard = () => {
-    if (!isPlayerTurn) return;
-    if (voluntad >= 1 && hand.length < 5 && deck.length > 0) {
-      const nextCard = deck[0];
-      setHand([...hand, nextCard]);
-      setDeck(deck.slice(1));
-      setVoluntad(v => v - 1);
-    }
+  // Manejadores específicos de la UI del jugador
+  const handleDrawCard = () => {
+    drawCard(true);
   };
 
-  // Función para jugar carta
-  const playCard = (slotIndex: number) => {
-    if (!isPlayerTurn) return;
+  const handlePlayCard = (slotIndex: number) => {
     if (selectedHandCardIndex === null) return;
-
-    const card = hand[selectedHandCardIndex];
-    if (card.suit === 'jokers') return;
-
-    if (!board[slotIndex].card) {
-      const newBoard = [...board];
-      newBoard[slotIndex] = { card, stack: [card] };
-      setBoard(newBoard);
-
-      const newHand = hand.filter((_, i) => i !== selectedHandCardIndex);
-      setHand(newHand);
-      setSelectedHandCardIndex(null);
-    }
-  };
-
-  // Función para usar Joker
-  const useJoker = () => {
-    if (!isPlayerTurn) return;
-    if (selectedHandCardIndex === null) return;
-    const card = hand[selectedHandCardIndex];
-    if (card.suit !== 'jokers') return;
-
-    if (voluntad >= 1) {
-      const newHand = hand.filter((_, i) => i !== selectedHandCardIndex);
-      setHand(newHand);
-      setVoluntad(v => v - 1);
-      setSelectedHandCardIndex(null);
-    }
-  };
-
-  const endTurn = () => {
-    if (!isPlayerTurn) return;
-    setVoluntad(v => Math.min(v + 2, 10));
-    if (board.filter(s => s.card).length === 0) {
-      setHp(prev => Math.max(0, prev - 10));
-    }
+    playCard(true, slotIndex, selectedHandCardIndex);
     setSelectedHandCardIndex(null);
-    setIsPlayerTurn(false);
   };
 
-  const selectedIsJoker = selectedHandCardIndex !== null && hand[selectedHandCardIndex].suit === 'jokers';
+  const handlePlayerSlotClick = (slotIndex: number) => {
+    const slot = board[slotIndex];
+    if (!slot.card) {
+      if (selectedHandCardIndex !== null) {
+        handlePlayCard(slotIndex);
+      }
+    } else {
+      if (!isPlayerTurn) return;
+      if (gameState.playerAttackedIndices.includes(slotIndex)) return; // ya atacó
+      setSelectedAttackerIndex(prev => prev === slotIndex ? null : slotIndex);
+      setSelectedHandCardIndex(null);
+    }
+  };
+
+  const handleOpponentSlotClick = (slotIndex: number) => {
+    const slot = opponentBoard[slotIndex];
+    if (selectedAttackerIndex !== null && slot.card) {
+      gameState.attackCard(true, selectedAttackerIndex, slotIndex);
+      setSelectedAttackerIndex(null);
+    } else {
+      if (slot.card) {
+        setViewingCard(slot.card);
+      }
+    }
+  };
+
+  const handleAttackDirectly = () => {
+    if (selectedAttackerIndex === null) return;
+    gameState.attackDirectly(true, selectedAttackerIndex);
+    setSelectedAttackerIndex(null);
+  };
+
+  const handleUseJoker = () => {
+    if (selectedHandCardIndex === null) return;
+    useJoker(true, selectedHandCardIndex);
+    setSelectedHandCardIndex(null);
+  };
+
+  const handleEndTurn = () => {
+    endTurn(true);
+    setSelectedHandCardIndex(null);
+    setSelectedAttackerIndex(null);
+  };
+
+  const selectedIsJoker = selectedHandCardIndex !== null && hand[selectedHandCardIndex]?.suit === 'jokers';
 
   return (
     <motion.div 
@@ -260,8 +175,11 @@ const Game: React.FC = () => {
         </div>
 
         <div className="flex justify-around items-center w-full max-w-2xl gap-4 md:gap-12">
-          <div className="flex flex-col items-center flex-1">
-            <span className="text-[7px] md:text-[9px] text-red-500/80 uppercase tracking-[0.2em] mb-0.5">Oponente {!isPlayerTurn && '(Pensando...)'}</span>
+          <div
+            onClick={selectedAttackerIndex !== null ? handleAttackDirectly : undefined}
+            className={`flex flex-col items-center flex-1 transition-all duration-300 ${selectedAttackerIndex !== null ? 'cursor-crosshair scale-105 border border-red-500/40 p-1 bg-red-950/20 rounded shadow-[0_0_15px_rgba(220,38,38,0.2)] animate-pulse' : ''}`}
+          >
+            <span className="text-[7px] md:text-[9px] text-red-500/80 uppercase tracking-[0.2em] mb-0.5">Oponente {!isPlayerTurn && '(Pensando...)'} {selectedAttackerIndex !== null && '🎯 ATACAR'}</span>
             <div className="w-full max-w-[120px] md:max-w-[180px] h-1.5 bg-red-950/30 rounded-full border border-red-900/20 relative overflow-hidden">
               <motion.div className="absolute inset-0 bg-red-600 shadow-[0_0_8px_red]" animate={{ width: `${opponentHp}%` }} />
             </div>
@@ -300,7 +218,14 @@ const Game: React.FC = () => {
       <main className="flex-1 relative z-10 flex flex-col justify-center items-center gap-2 md:gap-4 p-2 md:p-4 overflow-visible">
         <div className="flex justify-center gap-2 md:gap-4 w-full max-w-3xl overflow-visible">
           {opponentBoard.map((slot, i) => (
-            <BoardSlotView key={`opp-${i}`} slot={slot} isOpponent onSelect={setViewingCard} />
+            <BoardSlotView
+              key={`opp-${i}`}
+              slot={slot}
+              isOpponent
+              onSelect={setViewingCard}
+              isActiveToAttack={selectedAttackerIndex !== null && slot.card !== null}
+              onClick={() => handleOpponentSlotClick(i)}
+            />
           ))}
         </div>
         <div className="w-[60%] max-w-xl h-px bg-gradient-to-r from-transparent via-white/10 to-transparent relative">
@@ -317,8 +242,10 @@ const Game: React.FC = () => {
               key={`player-${i}`}
               slot={slot}
               onSelect={setViewingCard}
+              isAttacking={selectedAttackerIndex === i}
+              hasAttacked={gameState.playerAttackedIndices.includes(i)}
               isActiveToPlay={selectedHandCardIndex !== null && !slot.card && !selectedIsJoker}
-              onClick={() => playCard(i)}
+              onClick={() => handlePlayerSlotClick(i)}
             />
           ))}
         </div>
@@ -327,7 +254,7 @@ const Game: React.FC = () => {
       {/* FOOTER: Mano y Controles */}
       <footer className={`relative z-20 p-2 md:p-3 bg-gradient-to-t from-black via-black/95 to-transparent flex flex-col md:flex-row justify-center items-center gap-2 md:gap-6 shrink-0 border-t border-white/5 overflow-visible transition-opacity duration-500 ${!isPlayerTurn ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="flex items-center gap-3 md:gap-6 w-full md:w-auto justify-center overflow-visible">
-          <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={drawCard}>
+          <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={handleDrawCard}>
             <div className="w-10 h-15 sm:w-14 sm:h-21 md:w-18 md:h-28 border border-white/10 rounded-md bg-[#080808] flex items-center justify-center group-hover:border-primary-gold/50 transition-all shadow-2xl relative overflow-hidden shrink-0">
               <Layers className="text-white/10 group-hover:text-primary-gold/40 transition-colors" size={16} />
               <div className="absolute inset-0 bg-gradient-to-tr from-primary-gold/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -359,7 +286,7 @@ const Game: React.FC = () => {
               <motion.button
                 key="use-joker"
                 initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-                onClick={useJoker}
+                onClick={handleUseJoker}
                 className="flex-1 md:w-full py-2.5 md:py-4 px-4 bg-purple-600 text-white font-black uppercase tracking-widest rounded border border-purple-400 shadow-xl hover:bg-purple-500 transition-all text-[9px] md:text-xs flex flex-col items-center justify-center"
               >
                 <span>Usar Joker</span>
@@ -368,7 +295,7 @@ const Game: React.FC = () => {
               <motion.button
                 key="end-turn"
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                onClick={endTurn}
+                onClick={handleEndTurn}
                 className="flex-1 md:w-full py-2.5 md:py-4 px-4 bg-primary-gold text-black font-black uppercase tracking-widest rounded hover:bg-white transition-all shadow-xl text-[9px] md:text-xs text-center"
               >
                 Pasar Turno
@@ -534,15 +461,24 @@ const BoardSlotView: React.FC<{
   isOpponent?: boolean;
   onSelect: (c: CardData) => void;
   isActiveToPlay?: boolean;
+  isAttacking?: boolean;
+  hasAttacked?: boolean;
+  isActiveToAttack?: boolean;
   onClick?: () => void;
-}> = ({ slot, isOpponent, onSelect, isActiveToPlay, onClick }) => {
+}> = ({ slot, isOpponent, onSelect, isActiveToPlay, isAttacking, hasAttacked, isActiveToAttack, onClick }) => {
   return (
     <div
       onClick={onClick}
       className={`
         flex-1 max-w-[70px] sm:max-w-[90px] md:max-w-[110px] lg:max-w-[120px] aspect-[2/3] rounded-lg border flex items-center justify-center relative transition-all duration-500
         ${slot.card
-          ? 'border-white/5'
+          ? isAttacking
+            ? 'border-green-500 bg-green-500/10 shadow-[0_0_15px_rgba(34,197,94,0.4)] scale-105 z-30'
+            : hasAttacked
+              ? 'border-white/5 opacity-60'
+              : isActiveToAttack
+                ? 'border-red-500 bg-red-500/15 animate-pulse cursor-crosshair shadow-[0_0_20px_rgba(239,68,68,0.4)] z-30'
+                : 'border-white/5 bg-white/[0.01]'
           : isActiveToPlay
             ? 'border-primary-gold bg-primary-gold/10 animate-pulse cursor-pointer shadow-lg'
             : 'border-white/5 bg-white/[0.01]'}
@@ -552,13 +488,14 @@ const BoardSlotView: React.FC<{
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
           className="w-full h-full relative group cursor-pointer overflow-visible"
-          onClick={(e) => { e.stopPropagation(); onSelect(slot.card!); }}
+          onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+          onContextMenu={(e) => { e.preventDefault(); onSelect(slot.card!); }}
         >
           <div
             className={`w-full h-full relative rounded-md md:rounded-lg border-2 bg-[#080808] transition-all duration-500 group-hover:-translate-y-2 md:group-hover:-translate-y-4 group-hover:z-50`}
             style={{
-              borderColor: `${suitColors[slot.card.suit]}88`,
-              boxShadow: `0 0 15px ${suitColors[slot.card.suit]}11`
+              borderColor: isAttacking ? '#22c55e' : isActiveToAttack ? '#ef4444' : `${suitColors[slot.card.suit]}88`,
+              boxShadow: isAttacking ? '0 0 15px rgba(34,197,94,0.3)' : isActiveToAttack ? '0 0 15px rgba(239,68,68,0.3)' : `0 0 15px ${suitColors[slot.card.suit]}11`
             }}
           >
             <div className="w-full h-full overflow-hidden relative rounded-[inherit]">
