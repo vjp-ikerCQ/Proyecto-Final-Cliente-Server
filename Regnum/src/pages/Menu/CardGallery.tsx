@@ -100,14 +100,22 @@ const CardGallery: React.FC = () => {
   // Soporte para teclado
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (selectedCard) {
+          setSelectedCard(null);
+        } else {
+          navigate('/menu');
+        }
+        return;
+      }
+
       if (!selectedCard) return;
       if (e.key === 'ArrowLeft') handlePrev();
       if (e.key === 'ArrowRight') handleNext();
-      if (e.key === 'Escape') setSelectedCard(null);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedCard, handlePrev, handleNext]);
+  }, [selectedCard, handlePrev, handleNext, navigate]);
 
   return (
     <div className="min-h-screen bg-bg-main text-text-main p-8 font-cinzel relative overflow-y-auto">
