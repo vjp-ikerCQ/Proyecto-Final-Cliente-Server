@@ -84,6 +84,67 @@ const getCards = async (req, res) => {
     }
 };
 
+const getShuffledDeck = async (req, res) => {
+    try {
+        const db = getDB();
+        
+        if (!db) {
+            console.error('Database not connected');
+            return res.status(503).json({
+                success: false,
+                message: 'El servidor no está conectado a la base de datos'
+            });
+        }
+
+        // Obtener las cartas ordenadas aleatoriamente usando $sample directamente desde MongoDB
+        // Tomamos hasta 100 cartas para asegurarnos de que vienen todas las del mazo
+        const cartas = await db.collection('cartas')
+            .aggregate([{ $sample: { size: 100 } }])
+            .toArray();
+
+        const cartasFormateadas = cartas.map(carta => {
+            const paloFormateado = carta.palo ? carta.palo.toLowerCase() : 'desconocido';
+            let imageUrl = '';
+            
+            if (carta.image && (carta.image.startsWith('http') || carta.image.startsWith('https'))) {
+                imageUrl = carta.image;
+            } else if (paloFormateado === 'jokers' || paloFormateado === 'joker') {
+                imageUrl = `https://res.cloudinary.com/drvgncidb/image/upload/v1/Assets/Folders/Home/regnumhollow/Cards/joker_${carta.numero}.png`;
+            } else {
+                imageUrl = `https://res.cloudinary.com/drvgncidb/image/upload/v1/Assets/Folders/Home/regnumhollow/Cards/${paloFormateado}_${carta.numero}.png`;
+            }
+
+            return {
+                ...carta,
+                id: carta._id.toString(),
+                name: carta.nombre,
+                suit: paloFormateado === 'joker' ? 'jokers' : paloFormateado,
+                role: carta.calidad,
+                rank: carta.numero,
+                cost: carta.habilidad?.voluntad || 0,
+                attack: carta.habilidad?.cantidad || 0,
+                health: carta.vida || 0,
+                effect: carta.habilidad?.efecto || '',
+                image: imageUrl
+            };
+        });
+
+        return res.json({
+            success: true,
+            count: cartasFormateadas.length,
+            deck: cartasFormateadas
+        });
+
+    } catch (error) {
+        console.error("💥 ERROR EN GET SHUFFLED DECK:", error);
+        return res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
-    getCards
+    getCards,
+    getShuffledDeck
 };
