@@ -56,7 +56,7 @@ const getCards = async (req, res) => {
                 attack: carta.habilidad?.cantidad || 0,
                 health: carta.vida || 0,
                 effect: carta.habilidad?.efecto || '',
-                image: imageUrl
+                image: carta.imagen_url || imageUrl
             };
         });
 

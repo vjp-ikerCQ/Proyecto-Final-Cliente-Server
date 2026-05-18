@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useCallback } from 'react';
-import { allCards, type CardData } from '../../utils/cardData';
+import { type CardData } from '../../utils/cardData';
+import { fetchCards } from '../../services/cardsService';
 
 /**
  * Colores representativos para cada palo de la baraja
@@ -78,10 +78,15 @@ const CardGallery: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'TODAS' | 'ESPADAS' | 'COPAS' | 'OROS' | 'BASTOS' | 'JOKERS'>('TODAS');
   const [selectedCard, setSelectedCard] = useState<CardData | null>(null);
+  const [cards, setCards] = useState<CardData[]>([]);
 
-  const filteredCards = activeTab === 'TODAS' 
-    ? allCards 
-    : allCards.filter(card => card.suit === activeTab.toLowerCase());
+  useEffect(() => {
+    fetchCards().then(setCards).catch(console.error);
+  }, []);
+
+  const filteredCards = activeTab === 'TODAS'
+    ? cards
+    : cards.filter(card => card.suit === activeTab.toLowerCase());
 
   const handlePrev = useCallback(() => {
     if (!selectedCard) return;
