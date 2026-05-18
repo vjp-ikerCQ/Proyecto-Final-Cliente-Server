@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, X, ChevronLeft, ChevronRight, Volume2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useCallback } from 'react';
 import { allCards, type CardData } from '../../utils/cardData';
-import { useSettings } from '../../contexts/SettingsContext';
+import { useSettings, SFX_KEYS } from '../../contexts/SettingsContext';
 
 /**
  * Colores representativos para cada palo de la baraja
@@ -77,16 +76,46 @@ const CardTile: React.FC<{ card: CardData; onClick: () => void }> = ({ card, onC
  */
 const CardGallery: React.FC = () => {
   const navigate = useNavigate();
-  const { playSfx } = useSettings();
+  const { settings } = useSettings();
   const [activeTab, setActiveTab] = useState<'TODAS' | 'ESPADAS' | 'COPAS' | 'OROS' | 'BASTOS' | 'JOKERS'>('TODAS');
   const [selectedCard, setSelectedCard] = useState<CardData | null>(null);
 
-  const handleSelectCard = useCallback((card: CardData) => {
-    setSelectedCard(card);
-    if (card.sound) {
-      playSfx(card.sound);
+  // Referencia para pausar/reiniciar el audio activo de la galería
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Detener el sonido al cambiar de carta o cerrar la vista modal
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current = null;
+      }
+    };
+  }, [selectedCard]);
+
+  const playCardSound = useCallback((soundUrl?: string) => {
+    // Si hay un audio en reproducción, lo detenemos primero
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
-  }, [playSfx]);
+
+    if (!settings.isSfxEnabled) return;
+
+    const sfxSrc = soundUrl || SFX_KEYS.CLICK;
+    const audio = new Audio(sfxSrc);
+    audio.volume = settings.sfxVolume;
+    audioRef.current = audio;
+
+    audio.play().catch(err => console.log("SFX play blocked by browser:", err));
+
+    audio.onended = () => {
+      if (audioRef.current === audio) {
+        audioRef.current = null;
+      }
+    };
+  }, [settings.isSfxEnabled, settings.sfxVolume]);
 
   const filteredCards = activeTab === 'TODAS' 
     ? allCards 
@@ -96,23 +125,15 @@ const CardGallery: React.FC = () => {
     if (!selectedCard) return;
     const currentIndex = filteredCards.findIndex(c => c.id === selectedCard.id);
     const prevIndex = (currentIndex - 1 + filteredCards.length) % filteredCards.length;
-    const prevCard = filteredCards[prevIndex];
-    setSelectedCard(prevCard);
-    if (prevCard.sound) {
-      playSfx(prevCard.sound);
-    }
-  }, [selectedCard, filteredCards, playSfx]);
+    setSelectedCard(filteredCards[prevIndex]);
+  }, [selectedCard, filteredCards]);
 
   const handleNext = useCallback(() => {
     if (!selectedCard) return;
     const currentIndex = filteredCards.findIndex(c => c.id === selectedCard.id);
     const nextIndex = (currentIndex + 1) % filteredCards.length;
-    const nextCard = filteredCards[nextIndex];
-    setSelectedCard(nextCard);
-    if (nextCard.sound) {
-      playSfx(nextCard.sound);
-    }
-  }, [selectedCard, filteredCards, playSfx]);
+    setSelectedCard(filteredCards[nextIndex]);
+  }, [selectedCard, filteredCards]);
 
   // Soporte para teclado
   useEffect(() => {
@@ -192,7 +213,7 @@ const CardGallery: React.FC = () => {
                 <div className="grid grid-cols-2 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-6">
                   <AnimatePresence mode='popLayout'>
                     {normalCards.map((card) => (
-                      <CardTile key={card.id} card={card} onClick={() => handleSelectCard(card)} />
+                      <CardTile key={card.id} card={card} onClick={() => setSelectedCard(card)} />
                     ))}
                   </AnimatePresence>
                 </div>
@@ -207,7 +228,7 @@ const CardGallery: React.FC = () => {
                         key={card.id}
                         className="w-[calc((100%/2)-0.75rem)] xs:w-[calc((100%/2)-0.75rem)] sm:w-[calc((100%/3)-0.75rem)] md:w-[calc((100%/4)-1rem)] lg:w-[calc((100%/6)-1.25rem)]"
                       >
-                        <CardTile card={card} onClick={() => handleSelectCard(card)} />
+                        <CardTile card={card} onClick={() => setSelectedCard(card)} />
                       </div>
                     ))}
                   </AnimatePresence>
@@ -277,7 +298,7 @@ const CardGallery: React.FC = () => {
                   <motion.button
                     whileHover={{ scale: 1.1, boxShadow: '0 0 20px rgba(166, 138, 100, 0.6)' }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => playSfx(selectedCard.sound)}
+                    onClick={() => playCardSound(selectedCard.sound)}
                     className="flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-full border-2 border-primary-gold bg-bg-main/80 text-primary-gold hover:bg-primary-gold hover:text-bg-main transition-colors shadow-[0_0_15px_rgba(166,138,100,0.2)] shrink-0 self-center md:self-auto"
                     title="Reproducir sonido"
                   >

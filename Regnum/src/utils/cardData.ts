@@ -123,7 +123,7 @@ const generateCards = (): CardData[] => {
       }
 
       let soundUrl: string | undefined = undefined;
-      if (suit === 'bastos' && roleData.rank === 3) {
+      if (suit === 'bastos' && roleData.rank === 11) {
         soundUrl = 'https://res.cloudinary.com/drvgncidb/video/upload/v1779112084/hog-rider_aopui8.mp3';
       }
 
