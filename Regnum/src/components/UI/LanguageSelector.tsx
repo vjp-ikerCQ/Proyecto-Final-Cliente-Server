@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, Globe } from 'lucide-react';
+import { Globe } from 'lucide-react';
 
 const LANGUAGES = [
   { code: 'es', label: 'Español', flag: '🇪🇸' },
@@ -16,8 +16,6 @@ const LanguageSelector: React.FC = () => {
   const { i18n, t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-
-  const current = LANGUAGES.find(l => l.code === i18n.language) ?? LANGUAGES[0];
 
   // Cierra el dropdown al hacer clic fuera
   useEffect(() => {

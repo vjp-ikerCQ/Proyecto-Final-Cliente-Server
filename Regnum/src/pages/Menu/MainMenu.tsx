@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import {
   Sword,
   Trophy,
@@ -20,6 +20,7 @@ import GameControls from '../../components/UI/GameControls';
 import FireParticles from '../../components/UI/FireParticles';
 import AtmosphereParticles from '../../components/AtmosphereParticles';
 import { BarChart2 } from 'lucide-react';
+import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
 
 /**
  * Propiedades para el componente MainMenu
@@ -45,12 +46,17 @@ const CornerDecoration = () => (
  */
 const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
   const { t } = useTranslation();
+  const { playSfx, playMusic } = useSettings();
   // Estados para controlar la visibilidad de los modales
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isRankingsOpen, setIsRankingsOpen] = useState(false);
   
   const navigate = useNavigate();
+
+  useEffect(() => {
+    playMusic(MUSIC_KEYS.MENU);
+  }, []);
 
   // Definición de las opciones del menú principal
   const menuItems = [
@@ -65,6 +71,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
    * Maneja las acciones de cada botón del menú
    */
   const handleAction = (id: string) => {
+    playSfx();
     console.log('Menú - Acción pulsada:', id);
     switch (id) {
       case 'new-game':
@@ -101,7 +108,10 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
       {/* Botón de Estadísticas (Superior Izquierda) */}
       <div className="absolute top-4 left-4 md:top-8 md:left-8 z-20 animate-fade-in-down">
         <button
-          onClick={() => setIsStatsOpen(true)}
+          onClick={() => {
+            playSfx();
+            setIsStatsOpen(true);
+          }}
           className="p-2 md:p-3 border border-accent-gray bg-panel/50 text-primary-gold hover:bg-primary-gold hover:text-bg-main transition-all duration-300 rounded-sm flex items-center gap-2 group shadow-[0_0_15px_rgba(0,0,0,0.5)]"
           title="Ver Estadísticas"
         >

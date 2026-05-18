@@ -8,7 +8,7 @@ import { useSettings } from '../../contexts/SettingsContext';
  * Utiliza localStorage para persistir las preferencias del usuario.
  */
 const GameControls: React.FC = () => {
-  const { settings, updateSettings } = useSettings();
+  const { settings, updateSettings, playSfx } = useSettings();
 
   // Inicializa el modo oscuro desde localStorage o por defecto activado
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -34,7 +34,10 @@ const GameControls: React.FC = () => {
     <div className="absolute top-8 right-8 flex gap-4 z-10 animate-fade-in-down">
       {/* Botón de Control de Música */}
       <button 
-        onClick={() => updateSettings({ ...settings, isMusicEnabled: !settings.isMusicEnabled })}
+        onClick={() => {
+          playSfx();
+          updateSettings({ ...settings, isMusicEnabled: !settings.isMusicEnabled });
+        }}
         className="p-3 border border-accent-gray bg-panel/50 text-primary-gold hover:bg-primary-gold hover:text-bg-main transition-all duration-300 rounded-sm group shadow-[0_0_15px_rgba(0,0,0,0.5)]"
         title="Alternar Música"
       >
@@ -43,7 +46,10 @@ const GameControls: React.FC = () => {
 
       {/* Botón de Control de Tema (Oscuro/Claro) */}
       <button 
-        onClick={() => setIsDarkMode(!isDarkMode)}
+        onClick={() => {
+          playSfx();
+          setIsDarkMode(!isDarkMode);
+        }}
         className="p-3 border border-accent-gray bg-panel/50 text-primary-gold hover:bg-primary-gold hover:text-bg-main transition-all duration-300 rounded-sm shadow-[0_0_15px_rgba(0,0,0,0.5)]"
         title="Alternar Modo"
       >

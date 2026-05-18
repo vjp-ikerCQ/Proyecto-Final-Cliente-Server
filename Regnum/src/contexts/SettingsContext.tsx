@@ -11,6 +11,19 @@ export interface GameSettings {
   animSpeed: 'Lenta' | 'Normal' | 'Rápida';
 }
 
+export const SFX_KEYS = {
+  CLICK: 'https://res.cloudinary.com/drvgncidb/video/upload/v1779100080/click_tsrxnd.wav',
+  POWER_UP: 'https://res.cloudinary.com/drvgncidb/video/upload/v1779099971/powerUp_s09d5o.wav',
+  JUMP: 'https://res.cloudinary.com/drvgncidb/video/upload/v1779099971/jump_rkds9x.wav',
+  EXPLOSION: 'https://res.cloudinary.com/drvgncidb/video/upload/v1779099971/explosion_kmjzyu.wav',
+  HIT_HURT: 'https://res.cloudinary.com/drvgncidb/video/upload/v1779099971/hitHurt_upfnpu.wav'
+};
+
+export const MUSIC_KEYS = {
+  MENU: '/audio/menu.mp3',
+  BATTLE: 'https://res.cloudinary.com/drvgncidb/video/upload/v1779101394/battle_music_usxcot.mp3'
+};
+
 interface SettingsContextType {
   settings: GameSettings;
   updateSettings: (newSettings: GameSettings) => void;
@@ -18,6 +31,7 @@ interface SettingsContextType {
   revertSettings: (originalSettings: GameSettings) => void;
   playMusic: (src: string) => void;
   stopMusic: () => void;
+  playSfx: (src?: string) => void;
 }
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -84,6 +98,14 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
+  const playSfx = (src?: string) => {
+    if (!settings.isSfxEnabled) return;
+    const sfxSrc = src || SFX_KEYS.CLICK;
+    const audio = new Audio(sfxSrc);
+    audio.volume = settings.sfxVolume;
+    audio.play().catch(err => console.log("SFX play blocked by browser:", err));
+  };
+
   return (
     <SettingsContext.Provider value={{
       settings,
@@ -91,7 +113,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       saveSettings,
       revertSettings,
       playMusic,
-      stopMusic
+      stopMusic,
+      playSfx
     }}>
       {children}
     </SettingsContext.Provider>

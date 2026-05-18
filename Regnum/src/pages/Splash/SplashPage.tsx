@@ -5,9 +5,10 @@ import { useSettings } from '../../contexts/SettingsContext';
 
 const SplashPage: React.FC = () => {
   const navigate = useNavigate();
-  const { playMusic } = useSettings();
+  const { playMusic, playSfx } = useSettings();
 
   const handleStart = () => {
+    playSfx();
     playMusic('/audio/menu.mp3');
     navigate('/login');
   };

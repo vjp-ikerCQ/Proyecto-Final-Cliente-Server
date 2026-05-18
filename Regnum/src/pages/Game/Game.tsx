@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { allCards, type CardData } from '../../utils/cardData';
 import { fetchAllCards } from '../../services/cardService';
 import AtmosphereParticles from '../../components/AtmosphereParticles';
+import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
 
 /**
  * Colores representativos para cada palo
@@ -30,6 +31,23 @@ interface BoardSlot {
 
 const Game: React.FC = () => {
   const navigate = useNavigate();
+  const { playSfx, playMusic, stopMusic } = useSettings();
+
+  const handleSelectCard = (card: CardData) => {
+    playSfx();
+    setViewingCard(card);
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      playMusic(MUSIC_KEYS.BATTLE);
+    }, 1000);
+
+    return () => {
+      clearTimeout(timer);
+      stopMusic();
+    };
+  }, []);
 
   // Estado del Jugador
   const [voluntad, setVoluntad] = useState(10);
@@ -43,8 +61,8 @@ const Game: React.FC = () => {
   ]);
 
   // Estado del Oponente (Simulado)
-  const [opponentHp, setOpponentHp] = useState(100);
-  const [opponentBoard, setOpponentBoard] = useState<BoardSlot[]>([
+  const [opponentHp] = useState(100);
+  const [opponentBoard] = useState<BoardSlot[]>([
     { card: null, stack: [] },
     { card: null, stack: [] },
     { card: null, stack: [] }
@@ -118,6 +136,7 @@ const Game: React.FC = () => {
     if (card.suit === 'jokers') return;
 
     if (voluntad >= card.cost && !board[slotIndex].card) {
+      playSfx();
       const newBoard = [...board];
       newBoard[slotIndex] = { card, stack: [card] };
       setBoard(newBoard);
@@ -136,6 +155,7 @@ const Game: React.FC = () => {
     if (card.suit !== 'jokers') return;
 
     if (voluntad >= 1) {
+      playSfx();
       const newHand = hand.filter((_, i) => i !== selectedHandCardIndex);
       setHand(newHand);
       setVoluntad(v => v - 1);
@@ -185,7 +205,10 @@ const Game: React.FC = () => {
       </AnimatePresence>
         <div className="flex justify-between w-full sm:w-auto items-center px-2">
           <button
-            onClick={() => setShowSurrenderModal(true)}
+            onClick={() => {
+              playSfx();
+              setShowSurrenderModal(true);
+            }}
             className="flex items-center gap-1.5 text-gray-500 hover:text-red-500 transition-colors"
           >
             <ArrowLeft size={12} className="md:w-3.5 md:h-3.5" />
@@ -232,7 +255,7 @@ const Game: React.FC = () => {
       <main className="flex-1 relative z-10 flex flex-col justify-center items-center gap-2 md:gap-4 p-2 md:p-4 overflow-visible">
         <div className="flex justify-center gap-2 md:gap-4 w-full max-w-3xl overflow-visible">
           {opponentBoard.map((slot, i) => (
-            <BoardSlotView key={`opp-${i}`} slot={slot} isOpponent onSelect={setViewingCard} />
+            <BoardSlotView key={`opp-${i}`} slot={slot} isOpponent onSelect={handleSelectCard} />
           ))}
         </div>
         <div className="w-[60%] max-w-xl h-px bg-gradient-to-r from-transparent via-white/10 to-transparent relative">
@@ -248,7 +271,7 @@ const Game: React.FC = () => {
             <BoardSlotView
               key={`player-${i}`}
               slot={slot}
-              onSelect={setViewingCard}
+              onSelect={handleSelectCard}
               isActiveToPlay={selectedHandCardIndex !== null && !slot.card && !selectedIsJoker}
               onClick={() => playCard(i)}
             />
@@ -259,7 +282,10 @@ const Game: React.FC = () => {
       {/* FOOTER: Mano y Controles */}
       <footer className="relative z-20 p-2 md:p-3 bg-gradient-to-t from-black via-black/95 to-transparent flex flex-col md:flex-row justify-center items-center gap-2 md:gap-6 shrink-0 border-t border-white/5 overflow-visible">
         <div className="flex items-center gap-3 md:gap-6 w-full md:w-auto justify-center overflow-visible">
-          <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={drawCard}>
+          <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={() => {
+            playSfx();
+            drawCard();
+          }}>
             <div className="w-10 h-15 sm:w-14 sm:h-21 md:w-18 md:h-28 border border-white/10 rounded-md bg-[#080808] flex items-center justify-center group-hover:border-primary-gold/50 transition-all shadow-2xl relative overflow-hidden shrink-0">
               <Layers className="text-white/10 group-hover:text-primary-gold/40 transition-colors" size={16} />
               <div className="absolute inset-0 bg-gradient-to-tr from-primary-gold/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -274,9 +300,13 @@ const Game: React.FC = () => {
                   key={`${card.id}-${i}`}
                   card={card}
                   isSelected={selectedHandCardIndex === i}
-                  onClick={() => setSelectedHandCardIndex(selectedHandCardIndex === i ? null : i)}
+                  onClick={() => {
+                    playSfx();
+                    setSelectedHandCardIndex(selectedHandCardIndex === i ? null : i);
+                  }}
                   onRightClick={(e) => {
                     e.preventDefault();
+                    playSfx();
                     setViewingCard(card);
                   }}
                 />
@@ -291,7 +321,10 @@ const Game: React.FC = () => {
               <motion.button
                 key="use-joker"
                 initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-                onClick={useJoker}
+                onClick={() => {
+                  playSfx();
+                  useJoker();
+                }}
                 className="flex-1 md:w-full py-2.5 md:py-4 px-4 bg-purple-600 text-white font-black uppercase tracking-widest rounded border border-purple-400 shadow-xl hover:bg-purple-500 transition-all text-[9px] md:text-xs flex flex-col items-center justify-center"
               >
                 <span>Usar Joker</span>
@@ -300,7 +333,10 @@ const Game: React.FC = () => {
               <motion.button
                 key="end-turn"
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                onClick={endTurn}
+                onClick={() => {
+                  playSfx();
+                  endTurn();
+                }}
                 className="flex-1 md:w-full py-2.5 md:py-4 px-4 bg-primary-gold text-black font-black uppercase tracking-widest rounded hover:bg-white transition-all shadow-xl text-[9px] md:text-xs text-center"
               >
                 Pasar Turno
@@ -316,7 +352,10 @@ const Game: React.FC = () => {
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-modal-backdrop backdrop-blur-sm overflow-y-auto"
-            onClick={() => setViewingCard(null)}
+            onClick={() => {
+              playSfx();
+              setViewingCard(null);
+            }}
           >
             <div className="max-w-4xl w-full flex flex-col md:flex-row gap-6 md:gap-12 items-center" onClick={e => e.stopPropagation()}>
               <motion.div
@@ -334,7 +373,10 @@ const Game: React.FC = () => {
                   </div>
                 </div>
                 <div className="p-4 bg-surface border border-accent-gray/20 rounded-xl italic text-secondary-theme">"{viewingCard.effect}"</div>
-                <button onClick={() => setViewingCard(null)} className="md:hidden w-full py-3 bg-white/10 uppercase tracking-widest text-[10px] font-bold">Cerrar</button>
+                <button onClick={() => {
+                  playSfx();
+                  setViewingCard(null);
+                }} className="md:hidden w-full py-3 bg-white/10 uppercase tracking-widest text-[10px] font-bold">Cerrar</button>
               </div>
             </div>
           </motion.div>
@@ -367,13 +409,19 @@ const Game: React.FC = () => {
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <button
-                  onClick={() => setShowSurrenderModal(false)}
+                  onClick={() => {
+                    playSfx();
+                    setShowSurrenderModal(false);
+                  }}
                   className="flex-1 py-3 px-6 border border-white/10 rounded-lg text-white uppercase tracking-widest text-xs font-bold hover:bg-white/5 transition-all"
                 >
                   Seguir Luchando
                 </button>
                 <button
-                  onClick={() => navigate('/menu')}
+                  onClick={() => {
+                    playSfx();
+                    navigate('/menu');
+                  }}
                   className="flex-1 py-3 px-6 bg-red-600 text-white rounded-lg uppercase tracking-widest text-xs font-black hover:bg-red-500 shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all"
                 >
                   Rendirse
@@ -467,7 +515,7 @@ const BoardSlotView: React.FC<{
   onSelect: (c: CardData) => void;
   isActiveToPlay?: boolean;
   onClick?: () => void;
-}> = ({ slot, isOpponent, onSelect, isActiveToPlay, onClick }) => {
+}> = ({ slot, onSelect, isActiveToPlay, onClick }) => {
   return (
     <div
       onClick={onClick}
