@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, X, ChevronLeft, ChevronRight, Volume2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useCallback } from 'react';
 import { allCards, type CardData } from '../../utils/cardData';
+import { useSettings } from '../../contexts/SettingsContext';
 
 /**
  * Colores representativos para cada palo de la baraja
@@ -76,8 +77,16 @@ const CardTile: React.FC<{ card: CardData; onClick: () => void }> = ({ card, onC
  */
 const CardGallery: React.FC = () => {
   const navigate = useNavigate();
+  const { playSfx } = useSettings();
   const [activeTab, setActiveTab] = useState<'TODAS' | 'ESPADAS' | 'COPAS' | 'OROS' | 'BASTOS' | 'JOKERS'>('TODAS');
   const [selectedCard, setSelectedCard] = useState<CardData | null>(null);
+
+  const handleSelectCard = useCallback((card: CardData) => {
+    setSelectedCard(card);
+    if (card.sound) {
+      playSfx(card.sound);
+    }
+  }, [playSfx]);
 
   const filteredCards = activeTab === 'TODAS' 
     ? allCards 
@@ -87,15 +96,23 @@ const CardGallery: React.FC = () => {
     if (!selectedCard) return;
     const currentIndex = filteredCards.findIndex(c => c.id === selectedCard.id);
     const prevIndex = (currentIndex - 1 + filteredCards.length) % filteredCards.length;
-    setSelectedCard(filteredCards[prevIndex]);
-  }, [selectedCard, filteredCards]);
+    const prevCard = filteredCards[prevIndex];
+    setSelectedCard(prevCard);
+    if (prevCard.sound) {
+      playSfx(prevCard.sound);
+    }
+  }, [selectedCard, filteredCards, playSfx]);
 
   const handleNext = useCallback(() => {
     if (!selectedCard) return;
     const currentIndex = filteredCards.findIndex(c => c.id === selectedCard.id);
     const nextIndex = (currentIndex + 1) % filteredCards.length;
-    setSelectedCard(filteredCards[nextIndex]);
-  }, [selectedCard, filteredCards]);
+    const nextCard = filteredCards[nextIndex];
+    setSelectedCard(nextCard);
+    if (nextCard.sound) {
+      playSfx(nextCard.sound);
+    }
+  }, [selectedCard, filteredCards, playSfx]);
 
   // Soporte para teclado
   useEffect(() => {
@@ -175,7 +192,7 @@ const CardGallery: React.FC = () => {
                 <div className="grid grid-cols-2 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-6">
                   <AnimatePresence mode='popLayout'>
                     {normalCards.map((card) => (
-                      <CardTile key={card.id} card={card} onClick={() => setSelectedCard(card)} />
+                      <CardTile key={card.id} card={card} onClick={() => handleSelectCard(card)} />
                     ))}
                   </AnimatePresence>
                 </div>
@@ -190,7 +207,7 @@ const CardGallery: React.FC = () => {
                         key={card.id}
                         className="w-[calc((100%/2)-0.75rem)] xs:w-[calc((100%/2)-0.75rem)] sm:w-[calc((100%/3)-0.75rem)] md:w-[calc((100%/4)-1rem)] lg:w-[calc((100%/6)-1.25rem)]"
                       >
-                        <CardTile card={card} onClick={() => setSelectedCard(card)} />
+                        <CardTile card={card} onClick={() => handleSelectCard(card)} />
                       </div>
                     ))}
                   </AnimatePresence>
@@ -246,14 +263,26 @@ const CardGallery: React.FC = () => {
 
               {/* Información Detallada */}
               <div className="flex-1 space-y-6 md:space-y-10 text-center md:text-left py-4 md:py-10">
-                <div className="relative">
-                  <span className="text-[8px] md:text-[10px] uppercase tracking-[0.5em] text-primary-gold mb-1 block font-spectral font-black">
-                    {selectedCard.suit} / {selectedCard.role}
-                  </span>
-                  <h2 className="text-2xl sm:text-4xl md:text-6xl font-black text-text-main uppercase tracking-tighter leading-none mb-2">
-                    {selectedCard.name}
-                  </h2>
-                  <div className="h-1 w-20 md:w-40 bg-primary-gold mx-auto md:mx-0" />
+                <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="text-center md:text-left">
+                    <span className="text-[8px] md:text-[10px] uppercase tracking-[0.5em] text-primary-gold mb-1 block font-spectral font-black">
+                      {selectedCard.suit} / {selectedCard.role}
+                    </span>
+                    <h2 className="text-2xl sm:text-4xl md:text-6xl font-black text-text-main uppercase tracking-tighter leading-none mb-2">
+                      {selectedCard.name}
+                    </h2>
+                    <div className="h-1 w-20 md:w-40 bg-primary-gold mx-auto md:mx-0" />
+                  </div>
+
+                  <motion.button
+                    whileHover={{ scale: 1.1, boxShadow: '0 0 20px rgba(166, 138, 100, 0.6)' }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => playSfx(selectedCard.sound)}
+                    className="flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-full border-2 border-primary-gold bg-bg-main/80 text-primary-gold hover:bg-primary-gold hover:text-bg-main transition-colors shadow-[0_0_15px_rgba(166,138,100,0.2)] shrink-0 self-center md:self-auto"
+                    title="Reproducir sonido"
+                  >
+                    <Volume2 size={24} className="md:w-7 md:h-7 animate-pulse" />
+                  </motion.button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 md:gap-8 max-w-md mx-auto md:mx-0">

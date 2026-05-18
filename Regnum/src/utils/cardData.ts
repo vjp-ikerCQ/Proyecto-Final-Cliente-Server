@@ -14,6 +14,7 @@ export interface CardData {
   effect: string;          // Descripción del efecto base o habilidad
   image: string;           // Ruta a la imagen de la ilustración
   keyword?: string;        // Palabra clave (VENENO, VAMPIRO, etc.)
+  sound?: string;          // Opcional: Ruta al archivo de sonido de la carta
 }
 
 /**
@@ -121,6 +122,11 @@ const generateCards = (): CardData[] => {
           break;
       }
 
+      let soundUrl: string | undefined = undefined;
+      if (suit === 'bastos' && roleData.rank === 3) {
+        soundUrl = 'https://res.cloudinary.com/drvgncidb/video/upload/v1779112084/hog-rider_aopui8.mp3';
+      }
+
       cards.push({
         id: `${suit}-${roleData.rank}`,
         name: `${roleName} de ${suitNames[suit]}`,
@@ -132,7 +138,8 @@ const generateCards = (): CardData[] => {
         health: roleData.hp,
         attackType: roleData.atkType,
         effect: effect,
-        image: `https://res.cloudinary.com/drvgncidb/image/upload/v1/Assets/Folders/Home/regnumhollow/Cards/${suit}_${roleData.rank}.png`
+        image: `https://res.cloudinary.com/drvgncidb/image/upload/v1/Assets/Folders/Home/regnumhollow/Cards/${suit}_${roleData.rank}.png`,
+        sound: soundUrl
       });
     });
   });
