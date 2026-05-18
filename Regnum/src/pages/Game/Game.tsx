@@ -11,6 +11,7 @@ import { allCards, type CardData } from '../../utils/cardData';
 import { fetchAllCards } from '../../services/cardService';
 import AtmosphereParticles from '../../components/AtmosphereParticles';
 import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
+import SurrenderTransition from '../../components/UI/SurrenderTransition';
 
 /**
  * Colores representativos para cada palo
@@ -72,6 +73,7 @@ const Game: React.FC = () => {
   const [selectedHandCardIndex, setSelectedHandCardIndex] = useState<number | null>(null);
   const [viewingCard, setViewingCard] = useState<CardData | null>(null);
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
+  const [isSurrendering, setIsSurrendering] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -420,7 +422,8 @@ const Game: React.FC = () => {
                 <button
                   onClick={() => {
                     playSfx();
-                    navigate('/menu');
+                    setShowSurrenderModal(false);
+                    setIsSurrendering(true);
                   }}
                   className="flex-1 py-3 px-6 bg-red-600 text-white rounded-lg uppercase tracking-widest text-xs font-black hover:bg-red-500 shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all"
                 >
@@ -429,6 +432,12 @@ const Game: React.FC = () => {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isSurrendering && (
+          <SurrenderTransition onComplete={() => navigate('/menu')} />
         )}
       </AnimatePresence>
     </motion.div>

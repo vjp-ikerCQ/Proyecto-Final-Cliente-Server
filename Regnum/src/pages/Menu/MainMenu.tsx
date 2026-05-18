@@ -19,8 +19,11 @@ import RankingsModal from '../../components/Modal/RankingsModal';
 import GameControls from '../../components/UI/GameControls';
 import FireParticles from '../../components/UI/FireParticles';
 import AtmosphereParticles from '../../components/AtmosphereParticles';
+import BattleTransition from '../../components/UI/BattleTransition';
 import { BarChart2 } from 'lucide-react';
 import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
+import GalleryTransition from '../../components/UI/GalleryTransition';
+import LogoutTransition from '../../components/UI/LogoutTransition';
 
 /**
  * Propiedades para el componente MainMenu
@@ -51,6 +54,9 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isRankingsOpen, setIsRankingsOpen] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isGalleryTransitioning, setIsGalleryTransitioning] = useState(false);
+  const [isLogoutTransitioning, setIsLogoutTransitioning] = useState(false);
   
   const navigate = useNavigate();
 
@@ -75,20 +81,19 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
     console.log('Menú - Acción pulsada:', id);
     switch (id) {
       case 'new-game':
-        navigate('/game');
+        setIsTransitioning(true);
         break;
       case 'settings':
         setIsSettingsOpen(true);
         break;
       case 'gallery':
-        navigate('/gallery');
+        setIsGalleryTransitioning(true);
         break;
       case 'rankings':
         setIsRankingsOpen(true);
         break;
       case 'exit':
-        // Simulación de salida recargando la página
-        window.location.reload();
+        setIsLogoutTransitioning(true);
         break;
       default:
         console.log('Acción no implementada:', id);
@@ -193,6 +198,18 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
             isOpen={isRankingsOpen}
             onClose={() => setIsRankingsOpen(false)}
           />
+        )}
+
+        {isTransitioning && (
+          <BattleTransition onComplete={() => navigate('/game')} />
+        )}
+
+        {isGalleryTransitioning && (
+          <GalleryTransition onComplete={() => navigate('/gallery')} />
+        )}
+
+        {isLogoutTransitioning && (
+          <LogoutTransition onComplete={() => window.location.reload()} />
         )}
       </AnimatePresence>
     </div>
