@@ -21,6 +21,25 @@ export const fetchAllCards = async (): Promise<CardData[]> => {
 };
 
 /**
+ * Obtiene un mazo barajado al azar desde el backend
+ */
+export const fetchShuffledDeck = async (): Promise<CardData[]> => {
+  try {
+    const response = await fetch('http://localhost:5000/api/cards/deck');
+    const data = await response.json();
+
+    if (data.success) {
+      return data.deck;
+    }
+    
+    throw new Error(data.message || 'Error al obtener el mazo barajado');
+  } catch (error) {
+    console.error('Error fetching shuffled deck:', error);
+    return [];
+  }
+};
+
+/**
  * Obtiene cartas filtradas por palo
  */
 export const fetchCardsBySuit = async (suit: string): Promise<CardData[]> => {

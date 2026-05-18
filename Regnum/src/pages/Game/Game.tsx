@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { allCards, type CardData } from '../../utils/cardData';
-import { fetchAllCards } from '../../services/cardService';
+import { fetchShuffledDeck } from '../../services/cardService';
 import AtmosphereParticles from '../../components/AtmosphereParticles';
 
 /**
@@ -35,15 +35,20 @@ const Game: React.FC = () => {
   const [voluntad, setVoluntad] = useState(10);
   const [hp, setHp] = useState(100);
   const [hand, setHand] = useState<CardData[]>([]);
-  const [deck, setDeck] = useState<CardData[]>([]);
+  const [deck, setDeck] = useState<CardData[]>([]); // Mazo compartido
   const [board, setBoard] = useState<BoardSlot[]>([
     { card: null, stack: [] },
     { card: null, stack: [] },
     { card: null, stack: [] }
   ]);
 
+  // Estado de Turnos
+  const [isPlayerTurn, setIsPlayerTurn] = useState(true);
+
   // Estado del Oponente (Simulado)
   const [opponentHp, setOpponentHp] = useState(100);
+  const [opponentVoluntad, setOpponentVoluntad] = useState(10);
+  const [opponentHand, setOpponentHand] = useState<CardData[]>([]);
   const [opponentBoard, setOpponentBoard] = useState<BoardSlot[]>([
     { card: null, stack: [] },
     { card: null, stack: [] },
@@ -70,21 +75,33 @@ const Game: React.FC = () => {
     const initializeGame = async () => {
       setIsLoading(true);
       try {
-        const allBackendCards = await fetchAllCards();
+        // Pedimos un único mazo central barajado al backend
+        const sharedShuffledDeck = await fetchShuffledDeck();
+
+        // Repartir 3 cartas al jugador
+        const playerInitialHand = sharedShuffledDeck.slice(0, 3);
         
-        // Barajar el mazo (Fisher-Yates Shuffle)
-        const shuffledDeck = [...allBackendCards];
-        for (let i = shuffledDeck.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [shuffledDeck[i], shuffledDeck[j]] = [shuffledDeck[j], shuffledDeck[i]];
-        }
+        // Repartir las siguientes 3 cartas al oponente
+        const opponentInitialHand = sharedShuffledDeck.slice(3, 6);
+        
+        // El resto de cartas forman el mazo central compartido
+        const remainingDeck = sharedShuffledDeck.slice(6);
 
-        // Robar las primeras 3 cartas
-        const initialHand = shuffledDeck.slice(0, 3);
-        const remainingDeck = shuffledDeck.slice(3);
-
-        setHand(initialHand);
+        setHand(playerInitialHand);
+        setOpponentHand(opponentInitialHand);
         setDeck(remainingDeck);
+
+        // Para probar, vamos a poner la primera carta del oponente en su tablero
+        const initialOpponentBoard = [
+          { card: opponentInitialHand[0], stack: [opponentInitialHand[0]] },
+          { card: null, stack: [] },
+          { card: null, stack: [] }
+        ];
+        
+        // Removemos la carta jugada de la mano del oponente
+        setOpponentHand(opponentInitialHand.slice(1));
+        setOpponentBoard(initialOpponentBoard);
+
       } catch (error) {
         console.error("Error inicializando el juego:", error);
         // Fallback a cartas locales si el backend falla
@@ -100,8 +117,51 @@ const Game: React.FC = () => {
     initializeGame();
   }, []);
 
+  // Lógica del Turno del Bot
+  useEffect(() => {
+    if (isPlayerTurn || isLoading) return;
+
+    const playBotTurn = async () => {
+      // 1. Pausa inicial para que se note que es el turno del bot
+      await new Promise(r => setTimeout(r, 1000));
+
+      let currentVoluntad = opponentVoluntad;
+      let currentDeck = [...deck];
+      let currentOpponentHand = [...opponentHand];
+
+      // 2. El bot roba cartas siempre que pueda
+      while (currentVoluntad >= 1 && currentOpponentHand.length < 5 && currentDeck.length > 0) {
+        await new Promise(r => setTimeout(r, 800)); // Pausa entre cada carta que roba
+        
+        const nextCard = currentDeck[0];
+        currentOpponentHand.push(nextCard);
+        currentDeck = currentDeck.slice(1);
+        currentVoluntad -= 1;
+
+        // Actualizamos estado visualmente paso a paso
+        setOpponentHand([...currentOpponentHand]);
+        setDeck([...currentDeck]);
+        setOpponentVoluntad(currentVoluntad);
+      }
+
+      // 3. Pequeña pausa antes de terminar turno
+      await new Promise(r => setTimeout(r, 1000));
+
+      // 4. Terminar turno del bot
+      setOpponentVoluntad(v => Math.min(v + 2, 10));
+      if (opponentBoard.filter(s => s.card).length === 0) {
+        setOpponentHp(prev => Math.max(0, prev - 10));
+      }
+      setIsPlayerTurn(true);
+    };
+
+    playBotTurn();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlayerTurn, isLoading]); // Solo dependemos de estos para que no se re-ejecute en bucle
+
   // Función para robar carta del mazo real
   const drawCard = () => {
+    if (!isPlayerTurn) return;
     if (voluntad >= 1 && hand.length < 5 && deck.length > 0) {
       const nextCard = deck[0];
       setHand([...hand, nextCard]);
@@ -112,25 +172,26 @@ const Game: React.FC = () => {
 
   // Función para jugar carta
   const playCard = (slotIndex: number) => {
+    if (!isPlayerTurn) return;
     if (selectedHandCardIndex === null) return;
 
     const card = hand[selectedHandCardIndex];
     if (card.suit === 'jokers') return;
 
-    if (voluntad >= card.cost && !board[slotIndex].card) {
+    if (!board[slotIndex].card) {
       const newBoard = [...board];
       newBoard[slotIndex] = { card, stack: [card] };
       setBoard(newBoard);
 
       const newHand = hand.filter((_, i) => i !== selectedHandCardIndex);
       setHand(newHand);
-      setVoluntad(v => v - card.cost);
       setSelectedHandCardIndex(null);
     }
   };
 
   // Función para usar Joker
   const useJoker = () => {
+    if (!isPlayerTurn) return;
     if (selectedHandCardIndex === null) return;
     const card = hand[selectedHandCardIndex];
     if (card.suit !== 'jokers') return;
@@ -144,10 +205,13 @@ const Game: React.FC = () => {
   };
 
   const endTurn = () => {
+    if (!isPlayerTurn) return;
     setVoluntad(v => Math.min(v + 2, 10));
     if (board.filter(s => s.card).length === 0) {
       setHp(prev => Math.max(0, prev - 10));
     }
+    setSelectedHandCardIndex(null);
+    setIsPlayerTurn(false);
   };
 
   const selectedIsJoker = selectedHandCardIndex !== null && hand[selectedHandCardIndex].suit === 'jokers';
@@ -197,14 +261,18 @@ const Game: React.FC = () => {
 
         <div className="flex justify-around items-center w-full max-w-2xl gap-4 md:gap-12">
           <div className="flex flex-col items-center flex-1">
-            <span className="text-[7px] md:text-[9px] text-red-500/80 uppercase tracking-[0.2em] mb-0.5">Oponente</span>
+            <span className="text-[7px] md:text-[9px] text-red-500/80 uppercase tracking-[0.2em] mb-0.5">Oponente {!isPlayerTurn && '(Pensando...)'}</span>
             <div className="w-full max-w-[120px] md:max-w-[180px] h-1.5 bg-red-950/30 rounded-full border border-red-900/20 relative overflow-hidden">
               <motion.div className="absolute inset-0 bg-red-600 shadow-[0_0_8px_red]" animate={{ width: `${opponentHp}%` }} />
             </div>
+            {/* Opcional: mostrar voluntad del oponente (útil para debug o gameplay) */}
+            <span className="text-[6px] md:text-[8px] text-red-400 mt-1">Voluntad: {opponentVoluntad} / Mano: {opponentHand.length}</span>
           </div>
           <div className="text-xl font-black text-gold-gradient tracking-widest uppercase hidden md:block">REGNUM HOLLOW</div>
           <div className="flex flex-col items-center flex-1">
-            <span className="text-[7px] md:text-[9px] text-blue-400 uppercase tracking-[0.2em] mb-0.5">Jugador</span>
+            <span className={`text-[7px] md:text-[9px] ${isPlayerTurn ? 'text-blue-400' : 'text-blue-400/50'} uppercase tracking-[0.2em] mb-0.5`}>
+              Jugador {isPlayerTurn && '(Tu Turno)'}
+            </span>
             <div className="w-full max-w-[120px] md:max-w-[180px] h-1.5 bg-blue-950/30 rounded-full border border-blue-900/20 relative overflow-hidden">
               <motion.div className="absolute inset-0 bg-blue-500 shadow-[0_0_8px_blue]" animate={{ width: `${hp}%` }} />
             </div>
@@ -257,7 +325,7 @@ const Game: React.FC = () => {
       </main>
 
       {/* FOOTER: Mano y Controles */}
-      <footer className="relative z-20 p-2 md:p-3 bg-gradient-to-t from-black via-black/95 to-transparent flex flex-col md:flex-row justify-center items-center gap-2 md:gap-6 shrink-0 border-t border-white/5 overflow-visible">
+      <footer className={`relative z-20 p-2 md:p-3 bg-gradient-to-t from-black via-black/95 to-transparent flex flex-col md:flex-row justify-center items-center gap-2 md:gap-6 shrink-0 border-t border-white/5 overflow-visible transition-opacity duration-500 ${!isPlayerTurn ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="flex items-center gap-3 md:gap-6 w-full md:w-auto justify-center overflow-visible">
           <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={drawCard}>
             <div className="w-10 h-15 sm:w-14 sm:h-21 md:w-18 md:h-28 border border-white/10 rounded-md bg-[#080808] flex items-center justify-center group-hover:border-primary-gold/50 transition-all shadow-2xl relative overflow-hidden shrink-0">
