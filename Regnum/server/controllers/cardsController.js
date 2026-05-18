@@ -144,7 +144,42 @@ const getShuffledDeck = async (req, res) => {
     }
 };
 
+const updateCard = async (req, res) => {
+    try {
+        const db = getDB();
+        const { id } = req.params;
+        const updateData = req.body;
+        const { ObjectId } = require('mongodb');
+
+        let queryId;
+        try {
+            queryId = new ObjectId(id);
+        } catch (e) {
+            queryId = id;
+        }
+
+        // Eliminamos campos que no deben actualizarse en el $set directo
+        delete updateData._id;
+        delete updateData.id;
+
+        const result = await db.collection('cartas').updateOne(
+            { _id: queryId },
+            { $set: updateData }
+        );
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ success: false, message: 'Carta no encontrada' });
+        }
+
+        return res.json({ success: true, message: 'Carta actualizada correctamente' });
+    } catch (error) {
+        console.error("💥 ERROR AL ACTUALIZAR CARTA:", error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+};
+
 module.exports = {
     getCards,
-    getShuffledDeck
+    getShuffledDeck,
+    updateCard
 };

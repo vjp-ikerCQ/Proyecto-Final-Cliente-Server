@@ -34,6 +34,13 @@ const login = async (req, res) => {
             });
         }
 
+        if (usuario.status === 'Baneado') {
+            return res.status(403).json({
+                success: false,
+                message: 'Tu cuenta ha sido baneada. Puedes apelar esta decisión enviando un ticket de soporte.'
+            });
+        }
+
         // 🔐 comparación de password - buscar en todos los posibles campos
         console.log("🔑 CAMPOS DEL USUARIO:", Object.keys(usuario));
         const storedPassword = usuario.contrasena || usuario.contraseña || usuario.password;
@@ -242,7 +249,7 @@ const updateUser = async (req, res) => {
     try {
         const db = getDB();
         const { id } = req.params;
-        const { nombre, role } = req.body;
+        const { nombre, role, status } = req.body;
         const { ObjectId } = require('mongodb');
 
         if (!id) {
@@ -252,6 +259,7 @@ const updateUser = async (req, res) => {
         const updateData = {};
         if (nombre) updateData.nombre = nombre;
         if (role) updateData.role = role;
+        if (status) updateData.status = status;
 
         let queryId;
         const numId = Number(id);
