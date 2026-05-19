@@ -150,6 +150,14 @@ const Game: React.FC = () => {
 
   const isOpponentSlotActiveToAttack = (slotIndex: number) => {
     if (selectedAttackerIndex === null || !attackerCard) return false;
+
+    // Solo asesino, tanque, tirador, pícaro, mago y sota pueden elegir a qué carta pegar
+    const TARGETING_ROLES = ['ASESINO', 'TANQUE', 'TIRADOR', 'PICARO', 'MAGO', 'SOTA'];
+    if (!TARGETING_ROLES.includes(attackerCard.role.toUpperCase())) {
+      // Si no es un rol de target, solo puede pegar a su propia columna vertical
+      if (selectedAttackerIndex !== slotIndex) return false;
+    }
+
     // Restricciones:
     if (attackerCard.attackType === 'SOPORTE') return false; // Soporte no ataca cartas
     if (attackerCard.attackType === 'DIRECTO') return false; // Reyes no atacan cartas
@@ -161,11 +169,18 @@ const Game: React.FC = () => {
     if (selectedAttackerIndex === null || !attackerCard) return false;
     if (attackerCard.attackType === 'SOPORTE') return false; // Curanderos/Clérigos no atacan cara
     
+    const TARGETING_ROLES = ['ASESINO', 'TANQUE', 'TIRADOR', 'PICARO', 'MAGO', 'SOTA'];
+    const hasOpponentCards = opponentBoard.some(s => s.card);
+
+    // Si es una carta de daño a un solo objetivo, no puede atacar cara si hay cartas enemigas
+    if (TARGETING_ROLES.includes(attackerCard.role.toUpperCase())) {
+      if (hasOpponentCards) return false;
+    }
+
     // Si tiene tipo de ataque DIRECTO, puede atacar siempre.
     if (attackerCard.attackType === 'DIRECTO') return true;
     
     // Si no, solo si no hay cartas enemigas en el tablero
-    const hasOpponentCards = opponentBoard.some(s => s.card);
     return !hasOpponentCards;
   };
 

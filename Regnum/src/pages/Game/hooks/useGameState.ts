@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { type CardData, allCards } from '../../../utils/cardData';
 import { fetchShuffledDeck } from '../../../services/cardService';
 
+const TARGETING_ROLES = ['ASESINO', 'TANQUE', 'TIRADOR', 'PICARO', 'MAGO', 'SOTA'];
+
 export interface BoardSlot {
   card: CardData | null;
   stack: CardData[];
@@ -169,6 +171,11 @@ export const useGameState = () => {
 
     const attackerCard = attackerSlot.card;
 
+    // Si no es una de las cartas que pueden elegir a qué carta pegar, solo puede pegar a su propia columna
+    if (!TARGETING_ROLES.includes(attackerCard.role.toUpperCase())) {
+      if (attackerSlotIndex !== targetSlotIndex) return;
+    }
+
     // Restricciones de combate según attackType
     if (attackerCard.attackType === 'SOPORTE') return; // Soporte no ataca
     if (attackerCard.attackType === 'DIRECTO') return; // Reyes no atacan cartas
@@ -240,6 +247,12 @@ export const useGameState = () => {
     // Bloquear ataque directo si el defensor tiene cartas y no es ataque DIRECTO
     const defenderBoard = isPlayer ? opponentBoard : board;
     const hasDefenderCards = defenderBoard.some(s => s.card);
+
+    // Si es una carta de daño a un solo objetivo, no puede atacar directamente hasta que el tablero defensor esté vacío
+    if (TARGETING_ROLES.includes(attackerCard.role.toUpperCase())) {
+      if (hasDefenderCards) return;
+    }
+
     if (attackerCard.attackType !== 'DIRECTO' && hasDefenderCards) return;
 
     const damage = attackerCard.attack;
