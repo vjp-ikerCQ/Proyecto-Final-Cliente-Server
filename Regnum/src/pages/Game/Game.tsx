@@ -39,6 +39,7 @@ const Game: React.FC = () => {
     playCard,
     useJoker,
     endTurn,
+    healCard,
     setOpponentHand,
     setDeck,
     setOpponentVoluntad,
@@ -92,6 +93,16 @@ const Game: React.FC = () => {
         handlePlayCard(slotIndex);
       }
     } else {
+      // Si hay un atacante/curandero seleccionado, y hacemos clic en otro de nuestros slots...
+      if (selectedAttackerIndex !== null && slot.card) {
+        if (attackerCard?.role === 'CURANDERO' && selectedAttackerIndex !== slotIndex) {
+          // Es un curandero y hacemos clic en una carta aliada -> ¡CURAR!
+          healCard(true, selectedAttackerIndex, slotIndex);
+          setSelectedAttackerIndex(null);
+          return;
+        }
+      }
+
       if (!isPlayerTurn) return;
       if (gameState.playerAttackedIndices.includes(slotIndex)) return; // ya atacó
       setSelectedAttackerIndex(prev => prev === slotIndex ? null : slotIndex);
@@ -102,8 +113,10 @@ const Game: React.FC = () => {
   const handleOpponentSlotClick = (slotIndex: number) => {
     const slot = opponentBoard[slotIndex];
     if (selectedAttackerIndex !== null && slot.card) {
-      gameState.attackCard(true, selectedAttackerIndex, slotIndex);
-      setSelectedAttackerIndex(null);
+      if (isOpponentSlotActiveToAttack(slotIndex)) {
+        gameState.attackCard(true, selectedAttackerIndex, slotIndex);
+        setSelectedAttackerIndex(null);
+      }
     } else {
       if (slot.card) {
         setViewingCard(slot.card);
@@ -129,7 +142,39 @@ const Game: React.FC = () => {
     setSelectedAttackerIndex(null);
   };
 
-  const selectedIsJoker = selectedHandCardIndex !== null && hand[selectedHandCardIndex]?.suit === 'jokers';
+  const selectedHandCard = selectedHandCardIndex !== null ? hand[selectedHandCardIndex] : null;
+  const selectedIsJoker = selectedHandCard !== null && selectedHandCard.suit === 'jokers';
+  const canAffordSelected = selectedHandCard !== null && voluntad >= selectedHandCard.cost;
+
+  const attackerCard = selectedAttackerIndex !== null ? board[selectedAttackerIndex]?.card : null;
+
+  const isOpponentSlotActiveToAttack = (slotIndex: number) => {
+    if (selectedAttackerIndex === null || !attackerCard) return false;
+    // Restricciones:
+    if (attackerCard.attackType === 'SOPORTE') return false; // Soporte no ataca cartas
+    if (attackerCard.attackType === 'DIRECTO') return false; // Reyes no atacan cartas
+    if (attackerCard.attackType === 'COLUMNA' && selectedAttackerIndex !== slotIndex) return false; // Restricción de columna vertical
+    return true;
+  };
+
+  const canAttackDirectly = () => {
+    if (selectedAttackerIndex === null || !attackerCard) return false;
+    if (attackerCard.attackType === 'SOPORTE') return false; // Curanderos/Clérigos no atacan cara
+    
+    // Si tiene tipo de ataque DIRECTO, puede atacar siempre.
+    if (attackerCard.attackType === 'DIRECTO') return true;
+    
+    // Si no, solo si no hay cartas enemigas en el tablero
+    const hasOpponentCards = opponentBoard.some(s => s.card);
+    return !hasOpponentCards;
+  };
+
+  const isAlliedSlotActiveToHeal = (slotIndex: number) => {
+    if (selectedAttackerIndex === null || !attackerCard) return false;
+    if (attackerCard.role !== 'CURANDERO') return false;
+    const slot = board[slotIndex];
+    return selectedAttackerIndex !== slotIndex && slot.card !== null;
+  };
 
   return (
     <motion.div 
@@ -176,8 +221,8 @@ const Game: React.FC = () => {
 
         <div className="flex justify-around items-center w-full max-w-2xl gap-4 md:gap-12">
           <div
-            onClick={selectedAttackerIndex !== null ? handleAttackDirectly : undefined}
-            className={`flex flex-col items-center flex-1 transition-all duration-300 ${selectedAttackerIndex !== null ? 'cursor-crosshair scale-105 border border-red-500/40 p-1 bg-red-950/20 rounded shadow-[0_0_15px_rgba(220,38,38,0.2)] animate-pulse' : ''}`}
+            onClick={canAttackDirectly() ? handleAttackDirectly : undefined}
+            className={`flex flex-col items-center flex-1 transition-all duration-300 ${canAttackDirectly() ? 'cursor-crosshair scale-105 border border-red-500/40 p-1 bg-red-950/20 rounded shadow-[0_0_15px_rgba(220,38,38,0.2)] animate-pulse' : ''}`}
           >
             <span className="text-[7px] md:text-[9px] text-red-500/80 uppercase tracking-[0.2em] mb-0.5">Oponente {!isPlayerTurn && '(Pensando...)'} {selectedAttackerIndex !== null && '🎯 ATACAR'}</span>
             <div className="w-full max-w-[120px] md:max-w-[180px] h-1.5 bg-red-950/30 rounded-full border border-red-900/20 relative overflow-hidden">
@@ -223,7 +268,7 @@ const Game: React.FC = () => {
               slot={slot}
               isOpponent
               onSelect={setViewingCard}
-              isActiveToAttack={selectedAttackerIndex !== null && slot.card !== null}
+              isActiveToAttack={isOpponentSlotActiveToAttack(i) && slot.card !== null}
               onClick={() => handleOpponentSlotClick(i)}
             />
           ))}
@@ -244,7 +289,8 @@ const Game: React.FC = () => {
               onSelect={setViewingCard}
               isAttacking={selectedAttackerIndex === i}
               hasAttacked={gameState.playerAttackedIndices.includes(i)}
-              isActiveToPlay={selectedHandCardIndex !== null && !slot.card && !selectedIsJoker}
+              isActiveToPlay={selectedHandCardIndex !== null && !slot.card && !selectedIsJoker && canAffordSelected}
+              isActiveToHeal={isAlliedSlotActiveToHeal(i)}
               onClick={() => handlePlayerSlotClick(i)}
             />
           ))}
@@ -464,8 +510,9 @@ const BoardSlotView: React.FC<{
   isAttacking?: boolean;
   hasAttacked?: boolean;
   isActiveToAttack?: boolean;
+  isActiveToHeal?: boolean;
   onClick?: () => void;
-}> = ({ slot, isOpponent, onSelect, isActiveToPlay, isAttacking, hasAttacked, isActiveToAttack, onClick }) => {
+}> = ({ slot, isOpponent, onSelect, isActiveToPlay, isAttacking, hasAttacked, isActiveToAttack, isActiveToHeal, onClick }) => {
   return (
     <div
       onClick={onClick}
@@ -478,7 +525,9 @@ const BoardSlotView: React.FC<{
               ? 'border-white/5 opacity-60'
               : isActiveToAttack
                 ? 'border-red-500 bg-red-500/15 animate-pulse cursor-crosshair shadow-[0_0_20px_rgba(239,68,68,0.4)] z-30'
-                : 'border-white/5 bg-white/[0.01]'
+                : isActiveToHeal
+                  ? 'border-green-500 bg-green-500/15 animate-pulse cursor-pointer shadow-[0_0_20px_rgba(34,197,94,0.4)] z-30'
+                  : 'border-white/5 bg-white/[0.01]'
           : isActiveToPlay
             ? 'border-primary-gold bg-primary-gold/10 animate-pulse cursor-pointer shadow-lg'
             : 'border-white/5 bg-white/[0.01]'}
@@ -494,8 +543,8 @@ const BoardSlotView: React.FC<{
           <div
             className={`w-full h-full relative rounded-md md:rounded-lg border-2 bg-[#080808] transition-all duration-500 group-hover:-translate-y-2 md:group-hover:-translate-y-4 group-hover:z-50`}
             style={{
-              borderColor: isAttacking ? '#22c55e' : isActiveToAttack ? '#ef4444' : `${suitColors[slot.card.suit]}88`,
-              boxShadow: isAttacking ? '0 0 15px rgba(34,197,94,0.3)' : isActiveToAttack ? '0 0 15px rgba(239,68,68,0.3)' : `0 0 15px ${suitColors[slot.card.suit]}11`
+              borderColor: isAttacking ? '#22c55e' : isActiveToAttack ? '#ef4444' : isActiveToHeal ? '#22c55e' : `${suitColors[slot.card.suit]}88`,
+              boxShadow: isAttacking ? '0 0 15px rgba(34,197,94,0.3)' : isActiveToAttack ? '0 0 15px rgba(239,68,68,0.3)' : isActiveToHeal ? '0 0 15px rgba(34,197,94,0.3)' : `0 0 15px ${suitColors[slot.card.suit]}11`
             }}
           >
             <div className="w-full h-full overflow-hidden relative rounded-[inherit]">

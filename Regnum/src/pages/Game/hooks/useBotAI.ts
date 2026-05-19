@@ -59,9 +59,11 @@ export const useBotAI = ({
 
       // 3. El bot baja cartas a la mesa en los huecos vacíos
       for (let i = 0; i < 3; i++) {
-        // Si el hueco está libre, intenta jugar una carta no-joker de su mano
+        // Si el hueco está libre, intenta jugar una carta no-joker de su mano que pueda pagar
         if (!currentOpponentBoard[i].card) {
-          const playableCardIndex = currentOpponentHand.findIndex(card => card.suit !== 'jokers');
+          const playableCardIndex = currentOpponentHand.findIndex(
+            card => card.suit !== 'jokers' && card.cost <= currentVoluntad
+          );
           
           if (playableCardIndex !== -1) {
             await new Promise(r => setTimeout(r, 800)); // Retraso visual para ver la colocación
@@ -71,10 +73,12 @@ export const useBotAI = ({
             // Jugar la carta
             currentOpponentBoard[i] = { card: cardToPlay, stack: [cardToPlay] };
             currentOpponentHand = currentOpponentHand.filter((_, idx) => idx !== playableCardIndex);
+            currentVoluntad -= cardToPlay.cost; // Restar el coste de voluntad
             
             // Actualizar estados
             setOpponentBoard([...currentOpponentBoard]);
             setOpponentHand([...currentOpponentHand]);
+            setOpponentVoluntad(currentVoluntad); // Sincronizar voluntad del oponente
           }
         }
       }
