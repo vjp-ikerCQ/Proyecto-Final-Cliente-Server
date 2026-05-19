@@ -38,10 +38,11 @@ const getCards = async (req, res) => {
             let imageUrl = '';
             
             // Lógica para deducir la ruta de la imagen
+            const CLOUDINARY_BASE = 'https://res.cloudinary.com/drvgncidb/image/upload/v1778854628/Assets/Folders/Home/regnumhollow/Cards';
             if (paloFormateado === 'jokers' || paloFormateado === 'joker') {
-                imageUrl = `/src/assets/images/cards/joker_${carta.numero}.png`;
+                imageUrl = `${CLOUDINARY_BASE}/joker_${carta.numero}.png`;
             } else {
-                imageUrl = `/src/assets/images/cards/${paloFormateado}_${carta.numero}.png`;
+                imageUrl = `${CLOUDINARY_BASE}/${paloFormateado}_${carta.numero}.png`;
             }
 
             // Adaptamos las propiedades de la BD (español) a las que usa el frontend (inglés)

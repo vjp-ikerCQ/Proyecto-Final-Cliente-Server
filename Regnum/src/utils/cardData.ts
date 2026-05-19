@@ -14,6 +14,7 @@ export interface CardData {
   effect: string;          // Descripción del efecto base o habilidad
   image: string;           // Ruta a la imagen de la ilustración
   keyword?: string;        // Palabra clave (VENENO, VAMPIRO, etc.)
+  descripcion?: string;    // Texto descriptivo visible en la galería
 }
 
 /**

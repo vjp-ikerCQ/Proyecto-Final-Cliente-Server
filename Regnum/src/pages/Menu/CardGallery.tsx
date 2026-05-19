@@ -283,7 +283,7 @@ const CardGallery: React.FC = () => {
                 <div className="relative">
                    <div className="absolute -left-6 top-0 bottom-0 w-1 bg-primary-gold/20 hidden md:block" />
                    <p className="text-lg md:text-3xl text-secondary-theme font-light italic leading-relaxed md:pl-4">
-                      "{selectedCard.effect}"
+                      "{selectedCard.descripcion || selectedCard.effect}"
                    </p>
                 </div>
 
@@ -299,7 +299,7 @@ const CardGallery: React.FC = () => {
 
                 <button 
                   onClick={() => setSelectedCard(null)}
-                  className="flex items-center gap-3 text-muted hover:text-text-main transition-colors mx-auto md:mx-0 uppercase tracking-[0.3em] text-[10px] md:text-xs font-bold pt-10"
+                  className="flex items-center gap-3 text-muted hover:text-text-main transition-colors mx-auto md:mx-0 uppercase tracking-[0.3em] text-[10px] md:text-xs font-bold pt-10 cursor-pointer"
                 >
                   <X size={20} />
                   Cerrar Visualización
