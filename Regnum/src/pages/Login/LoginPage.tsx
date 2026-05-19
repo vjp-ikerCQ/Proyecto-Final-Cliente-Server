@@ -24,7 +24,17 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const [appealSuccess, setAppealSuccess] = useState(false);
   const [appealError, setAppealError] = useState(false);
 
+  const triggerFullscreen = () => {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) {
+      elem.requestFullscreen().catch((err) => {
+        console.warn("La solicitud de pantalla completa fue rechazada o bloqueada por el navegador:", err);
+      });
+    }
+  };
+
   const handleGuestEntry = () => {
+    triggerFullscreen();
     onLogin('Invitado', true);
   };
 
@@ -47,6 +57,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       });
       const data = await response.json();
       if (data.success) {
+        triggerFullscreen();
         onLogin(data.usuario.nombre, false);
       } else {
         setError(data.message || t('login.error_empty'));
