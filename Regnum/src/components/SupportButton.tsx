@@ -40,8 +40,8 @@ export default function SupportButton({ user }: SupportButtonProps) {
     }
   }, [isOpen]); // Recalcular al abrir el modal
 
-  // Solo mostrar en login y menú
-  if (location.pathname !== '/login' && location.pathname !== '/menu') {
+  // Solo mostrar en menú principal si el usuario está registrado (no invitado, no admin)
+  if (location.pathname !== '/menu' || !user || user.isGuest || user.name === 'admin') {
     return null;
   }
 
