@@ -177,10 +177,15 @@ const Game: React.FC = () => {
       if (hasOpponentCards) return false;
     }
 
-    // Si tiene tipo de ataque DIRECTO, puede atacar siempre.
+    // COLUMNA: puede atacar directo solo si su columna específica está vacía
+    if (attackerCard.attackType === 'COLUMNA') {
+      return !opponentBoard[selectedAttackerIndex].card;
+    }
+
+    // DIRECTO: puede atacar siempre
     if (attackerCard.attackType === 'DIRECTO') return true;
-    
-    // Si no, solo si no hay cartas enemigas en el tablero
+
+    // El resto: solo si no hay cartas enemigas
     return !hasOpponentCards;
   };
 

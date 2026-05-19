@@ -13,6 +13,7 @@ export interface CardData {
   attackType: string;      // Tipo de ataque (AREA, OBJETIVO, etc.)
   effect: string;          // Descripción del efecto base o habilidad
   image: string;           // Ruta a la imagen de la ilustración
+  maxHealth?: number;      // Vida máxima original de la carta
   keyword?: string;        // Palabra clave (VENENO, VAMPIRO, etc.)
   descripcion?: string;    // Texto descriptivo visible en la galería
 }

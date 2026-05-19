@@ -41,7 +41,6 @@ export const useGameState = () => {
 
   // Inicializar mazo
   const initializeGame = async () => {
-    setIsLoading(true);
     try {
       const sharedShuffledDeck = await fetchShuffledDeck();
 
@@ -85,7 +84,39 @@ export const useGameState = () => {
   };
 
   useEffect(() => {
-    initializeGame();
+    fetchShuffledDeck()
+      .then(sharedShuffledDeck => {
+        const playerInitialHand = sharedShuffledDeck.slice(0, 3);
+        const opponentInitialHand = sharedShuffledDeck.slice(3, 6);
+        const remainingDeck = sharedShuffledDeck.slice(6);
+
+        setHand(playerInitialHand);
+        setDeck(remainingDeck);
+
+        const initialOpponentBoard: BoardSlot[] = [
+          { card: null, stack: [] },
+          { card: null, stack: [] },
+          { card: null, stack: [] }
+        ];
+        let finalOpponentHand = [...opponentInitialHand];
+        const firstNonJokerIndex = opponentInitialHand.findIndex(card => card.suit !== 'jokers');
+        if (firstNonJokerIndex !== -1) {
+          const startCard = opponentInitialHand[firstNonJokerIndex];
+          initialOpponentBoard[0] = { card: startCard, stack: [startCard] };
+          finalOpponentHand = opponentInitialHand.filter((_, idx) => idx !== firstNonJokerIndex);
+        }
+        setOpponentHand(finalOpponentHand);
+        setOpponentBoard(initialOpponentBoard);
+        setIsLoading(false);
+      })
+      .catch(error => {
+        console.error('Error inicializando el juego:', error);
+        const fallbackHand = Array.from({ length: 3 }, () =>
+          allCards[Math.floor(Math.random() * allCards.length)]
+        );
+        setHand(fallbackHand);
+        setIsLoading(false);
+      });
   }, []);
 
   // Robar carta (jugador o bot)
@@ -242,18 +273,19 @@ export const useGameState = () => {
     const attackerCard = attackerSlot.card;
 
     // Restricciones de ataque directo
-    if (attackerCard.attackType === 'SOPORTE') return; // Soporte no ataca directamente
+    if (attackerCard.attackType === 'SOPORTE') return;
 
-    // Bloquear ataque directo si el defensor tiene cartas y no es ataque DIRECTO
     const defenderBoard = isPlayer ? opponentBoard : board;
     const hasDefenderCards = defenderBoard.some(s => s.card);
 
-    // Si es una carta de daño a un solo objetivo, no puede atacar directamente hasta que el tablero defensor esté vacío
-    if (TARGETING_ROLES.includes(attackerCard.role.toUpperCase())) {
+    // COLUMNA: solo puede atacar directo si su columna específica está vacía
+    if (attackerCard.attackType === 'COLUMNA') {
+      if (defenderBoard[attackerSlotIndex].card) return;
+    } else if (TARGETING_ROLES.includes(attackerCard.role.toUpperCase())) {
       if (hasDefenderCards) return;
+    } else if (attackerCard.attackType !== 'DIRECTO' && hasDefenderCards) {
+      return;
     }
-
-    if (attackerCard.attackType !== 'DIRECTO' && hasDefenderCards) return;
 
     const damage = attackerCard.attack;
     let damageNum = 0;
@@ -302,7 +334,7 @@ export const useGameState = () => {
     if (healerCard.role !== 'CURANDERO') return;
 
     const healAmount = 5;
-    const maxHp = getMaxHealthByRank(targetSlot.card.rank);
+    const maxHp = targetSlot.card.maxHealth ?? getMaxHealthByRank(targetSlot.card.rank);
     const currentHp = targetSlot.card.health;
     const targetNewHp = Math.min(maxHp, currentHp + healAmount);
 
