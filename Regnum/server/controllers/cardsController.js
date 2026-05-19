@@ -1,5 +1,16 @@
 const { getDB } = require('../config/db');
 
+const roleByRank = {
+    1: 'AS', 2: 'ASESINO', 3: 'BESTIA', 4: 'TANQUE', 5: 'CLERIGO',
+    6: 'CURANDERO', 7: 'TIRADOR', 8: 'PICARO', 9: 'MAGO',
+    10: 'SOTA', 11: 'CABALLO', 12: 'REY'
+};
+const targetToAttackType = {
+    'area': 'AREA', 'column': 'COLUMNA', 'selected': 'OBJETIVO',
+    'multiple': 'MULTIOBJETIVO', 'player': 'DIRECTO',
+    'ally': 'SOPORTE', 'none': 'SOPORTE'
+};
+
 const getCards = async (req, res) => {
     try {
         const db = getDB();
@@ -36,7 +47,7 @@ const getCards = async (req, res) => {
         const cartasFormateadas = cartas.map(carta => {
             const paloFormateado = carta.palo ? carta.palo.toLowerCase() : 'desconocido';
             let imageUrl = '';
-            
+
             // Lógica para deducir la ruta de la imagen
             const CLOUDINARY_BASE = 'https://res.cloudinary.com/drvgncidb/image/upload/v1778854628/Assets/Folders/Home/regnumhollow/Cards';
             if (paloFormateado === 'jokers' || paloFormateado === 'joker') {
@@ -47,17 +58,16 @@ const getCards = async (req, res) => {
 
             // Adaptamos las propiedades de la BD (español) a las que usa el frontend (inglés)
             return {
-                ...carta, // Mantenemos los datos originales por si acaso
+                ...carta,
                 id: carta._id.toString(),
                 name: carta.nombre,
-                suit: paloFormateado === 'joker' ? 'jokers' : paloFormateado, // El frontend usa 'jokers' en plural
-                role: carta.rol || carta.calidad, // Map role to rol (e.g. "TANQUE", "CURANDERO") or fallback to calidad
-                calidad: carta.calidad,
+                suit: paloFormateado === 'joker' ? 'jokers' : paloFormateado,
+                role: roleByRank[carta.numero] || carta.calidad,
                 rank: carta.numero,
                 cost: carta.habilidad?.voluntad || 0,
                 attack: carta.habilidad?.cantidad || 0,
                 health: carta.vida || 0,
-                attackType: carta.tipo_ataque || 'OBJETIVO', // Map attackType!
+                attackType: targetToAttackType[carta.habilidad?.target] || carta.tipo_ataque || 'OBJETIVO',
                 effect: carta.habilidad?.efecto || '',
                 keyword: carta.keyword || '',
                 image: carta.imagen_url || imageUrl
@@ -108,31 +118,25 @@ const getShuffledDeck = async (req, res) => {
 
         const cartasFormateadas = cartas.map(carta => {
             const paloFormateado = carta.palo ? carta.palo.toLowerCase() : 'desconocido';
-            let imageUrl = '';
-            
-            if (carta.image && (carta.image.startsWith('http') || carta.image.startsWith('https'))) {
-                imageUrl = carta.image;
-            } else if (paloFormateado === 'jokers' || paloFormateado === 'joker') {
-                imageUrl = `https://res.cloudinary.com/drvgncidb/image/upload/v1/Assets/Folders/Home/regnumhollow/Cards/joker_${carta.numero}.png`;
-            } else {
-                imageUrl = `https://res.cloudinary.com/drvgncidb/image/upload/v1/Assets/Folders/Home/regnumhollow/Cards/${paloFormateado}_${carta.numero}.png`;
-            }
+            const CLOUDINARY_BASE = 'https://res.cloudinary.com/drvgncidb/image/upload/v1778854628/Assets/Folders/Home/regnumhollow/Cards';
+            const imageUrl = paloFormateado === 'jokers' || paloFormateado === 'joker'
+                ? `${CLOUDINARY_BASE}/joker_${carta.numero}.png`
+                : `${CLOUDINARY_BASE}/${paloFormateado}_${carta.numero}.png`;
 
             return {
                 ...carta,
                 id: carta._id.toString(),
                 name: carta.nombre,
                 suit: paloFormateado === 'joker' ? 'jokers' : paloFormateado,
-                role: carta.rol || carta.calidad, // Map role to rol or fallback to calidad
-                calidad: carta.calidad,
+                role: roleByRank[carta.numero] || carta.calidad,
                 rank: carta.numero,
                 cost: carta.habilidad?.voluntad || 0,
                 attack: carta.habilidad?.cantidad || 0,
                 health: carta.vida || 0,
-                attackType: carta.tipo_ataque || 'OBJETIVO', // Map attackType!
+                attackType: targetToAttackType[carta.habilidad?.target] || carta.tipo_ataque || 'OBJETIVO',
                 effect: carta.habilidad?.efecto || '',
                 keyword: carta.keyword || '',
-                image: imageUrl
+                image: carta.imagen_url || imageUrl
             };
         });
 
