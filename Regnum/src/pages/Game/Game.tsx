@@ -104,6 +104,10 @@ const Game: React.FC = () => {
       if (selectedAttackerIndex !== null && slot.card) {
         if (attackerCard?.role === 'CURANDERO' && selectedAttackerIndex !== slotIndex) {
           // Es un curandero y hacemos clic en una carta aliada -> ¡CURAR!
+          if (voluntad < attackerCard.cost) {
+            setShowVoluntadWarning(true);
+            return;
+          }
           healCard(true, selectedAttackerIndex, slotIndex);
           setSelectedAttackerIndex(null);
           return;
@@ -207,6 +211,7 @@ const Game: React.FC = () => {
   const isAlliedSlotActiveToHeal = (slotIndex: number) => {
     if (selectedAttackerIndex === null || !attackerCard) return false;
     if (attackerCard.role !== 'CURANDERO') return false;
+    if (voluntad < attackerCard.cost) return false; // Voluntad insuficiente para curar
     const slot = board[slotIndex];
     return selectedAttackerIndex !== slotIndex && slot.card !== null;
   };

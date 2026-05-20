@@ -330,6 +330,10 @@ export const useGameState = () => {
     const healerCard = healerSlot.card;
     if (healerCard.role !== 'CURANDERO') return;
 
+    // Verificar voluntad suficiente para ejercer la curación
+    const currentVoluntad = isPlayer ? voluntad : opponentVoluntad;
+    if (currentVoluntad < healerCard.cost) return;
+
     const healAmount = 5;
     const maxHp = targetSlot.card.maxHealth ?? getMaxHealthByRank(targetSlot.card.rank);
     const currentHp = targetSlot.card.health;
@@ -343,9 +347,12 @@ export const useGameState = () => {
     };
     setAttackerBoard(newBoard);
 
+    // Descontar coste de voluntad del curandero
+    const setAttackerVoluntad = isPlayer ? setVoluntad : setOpponentVoluntad;
+    setAttackerVoluntad(v => v - healerCard.cost);
+
     // Curandero de Oros: +1 de voluntad si cura por completo
     if (healerCard.suit === 'oros' && targetNewHp === maxHp && currentHp < maxHp) {
-      const setAttackerVoluntad = isPlayer ? setVoluntad : setOpponentVoluntad;
       setAttackerVoluntad(v => Math.min(10, v + 1));
     }
 
