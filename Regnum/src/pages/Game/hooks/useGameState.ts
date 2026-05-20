@@ -143,26 +143,22 @@ export const useGameState = () => {
     if (isPlayer) {
       const card = hand[handCardIndex];
       if (card.suit === 'jokers') return;
-      if (voluntad < card.cost) return; // Validación de voluntad
 
       if (!board[slotIndex].card) {
         const newBoard = [...board];
         newBoard[slotIndex] = { card, stack: [card] };
         setBoard(newBoard);
         setHand(prev => prev.filter((_, i) => i !== handCardIndex));
-        setVoluntad(v => v - card.cost); // Restar el coste de voluntad
       }
     } else {
       const card = opponentHand[handCardIndex];
       if (card.suit === 'jokers') return;
-      if (opponentVoluntad < card.cost) return; // Validación de voluntad
 
       if (!opponentBoard[slotIndex].card) {
         const newBoard = [...opponentBoard];
         newBoard[slotIndex] = { card, stack: [card] };
         setOpponentBoard(newBoard);
         setOpponentHand(prev => prev.filter((_, i) => i !== handCardIndex));
-        setOpponentVoluntad(v => v - card.cost); // Restar el coste de voluntad
       }
     }
   };
@@ -190,9 +186,6 @@ export const useGameState = () => {
 
   // Lógica de ataque a una carta en tablero
   const attackCard = (isPlayer: boolean, attackerSlotIndex: number, targetSlotIndex: number) => {
-    const attackerAttackedIndices = isPlayer ? playerAttackedIndices : opponentAttackedIndices;
-    if (attackerAttackedIndices.includes(attackerSlotIndex)) return; // ya atacó
-
     const attackerBoard = isPlayer ? board : opponentBoard;
     const defenderBoard = isPlayer ? opponentBoard : board;
 
@@ -211,6 +204,10 @@ export const useGameState = () => {
     if (attackerCard.attackType === 'SOPORTE') return; // Soporte no ataca
     if (attackerCard.attackType === 'DIRECTO') return; // Reyes no atacan cartas
     if (attackerCard.attackType === 'COLUMNA' && attackerSlotIndex !== targetSlotIndex) return; // Restricción de columna
+
+    // Verificar voluntad suficiente para ejercer el ataque
+    const currentVoluntad = isPlayer ? voluntad : opponentVoluntad;
+    if (currentVoluntad < attackerCard.cost) return;
 
     const damage = attackerCard.attack;
     let damageNum = 0;
@@ -245,27 +242,23 @@ export const useGameState = () => {
       setDefenderHp(prev => Math.max(0, prev - damageNum));
     }
 
+    // Descontar coste de voluntad del atacante
+    const setAttackerVoluntad = isPlayer ? setVoluntad : setOpponentVoluntad;
+    setAttackerVoluntad(v => v - attackerCard.cost);
+
     // Habilidad de Asesino de Oros (Rank 2) -> +1 de voluntad
     if (attackerCard.rank === 2 && attackerCard.suit === 'oros') {
-      const setAttackerVoluntad = isPlayer ? setVoluntad : setOpponentVoluntad;
       setAttackerVoluntad(v => Math.min(10, v + 1));
     }
 
     // Habilidad de Tirador de Oros (Rank 7) al eliminar -> +2 de voluntad
     if (attackerCard.rank === 7 && attackerCard.suit === 'oros' && remainingHealth <= 0) {
-      const setAttackerVoluntad = isPlayer ? setVoluntad : setOpponentVoluntad;
       setAttackerVoluntad(v => Math.min(10, v + 2));
     }
-
-    const setAttackerAttackedIndices = isPlayer ? setPlayerAttackedIndices : setOpponentAttackedIndices;
-    setAttackerAttackedIndices(prev => [...prev, attackerSlotIndex]);
   };
 
   // Lógica de ataque directo al rival
   const attackDirectly = (isPlayer: boolean, attackerSlotIndex: number) => {
-    const attackerAttackedIndices = isPlayer ? playerAttackedIndices : opponentAttackedIndices;
-    if (attackerAttackedIndices.includes(attackerSlotIndex)) return; // ya atacó
-
     const attackerBoard = isPlayer ? board : opponentBoard;
     const attackerSlot = attackerBoard[attackerSlotIndex];
     if (!attackerSlot.card) return;
@@ -287,6 +280,10 @@ export const useGameState = () => {
       return;
     }
 
+    // Verificar voluntad suficiente para ejercer el ataque
+    const currentVoluntad = isPlayer ? voluntad : opponentVoluntad;
+    if (currentVoluntad < attackerCard.cost) return;
+
     const damage = attackerCard.attack;
     let damageNum = 0;
     const defenderHp = isPlayer ? opponentHp : hp;
@@ -303,14 +300,14 @@ export const useGameState = () => {
     const setDefenderHp = isPlayer ? setOpponentHp : setHp;
     setDefenderHp(prev => Math.max(0, prev - damageNum));
 
-    // Habilidad de Asesino de Oros (Rank 2) al atacar
+    // Descontar coste de voluntad del atacante
+    const setAttackerVoluntad = isPlayer ? setVoluntad : setOpponentVoluntad;
+    setAttackerVoluntad(v => v - attackerCard.cost);
+
+    // Habilidad de Asesino de Oros (Rank 2) al atacar -> +1 de voluntad
     if (attackerCard.rank === 2 && attackerCard.suit === 'oros') {
-      const setAttackerVoluntad = isPlayer ? setVoluntad : setOpponentVoluntad;
       setAttackerVoluntad(v => Math.min(10, v + 1));
     }
-
-    const setAttackerAttackedIndices = isPlayer ? setPlayerAttackedIndices : setOpponentAttackedIndices;
-    setAttackerAttackedIndices(prev => [...prev, attackerSlotIndex]);
   };
 
   const getMaxHealthByRank = (rank: number): number => {

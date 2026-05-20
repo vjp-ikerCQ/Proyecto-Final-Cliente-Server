@@ -66,6 +66,7 @@ const Game: React.FC = () => {
   const [viewingCard, setViewingCard] = useState<CardData | null>(null);
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
+  const [showVoluntadWarning, setShowVoluntadWarning] = useState(false);
 
   useEffect(() => {
     if (voluntad < 5) {
@@ -74,6 +75,12 @@ const Game: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [voluntad]);
+
+  useEffect(() => {
+    if (!showVoluntadWarning) return;
+    const timer = setTimeout(() => setShowVoluntadWarning(false), 2000);
+    return () => clearTimeout(timer);
+  }, [showVoluntadWarning]);
 
   // Manejadores específicos de la UI del jugador
   const handleDrawCard = () => {
@@ -116,6 +123,8 @@ const Game: React.FC = () => {
       if (isOpponentSlotActiveToAttack(slotIndex)) {
         gameState.attackCard(true, selectedAttackerIndex, slotIndex);
         setSelectedAttackerIndex(null);
+      } else if (attackerCard && voluntad < attackerCard.cost) {
+        setShowVoluntadWarning(true);
       }
     } else {
       if (slot.card) {
@@ -126,6 +135,10 @@ const Game: React.FC = () => {
 
   const handleAttackDirectly = () => {
     if (selectedAttackerIndex === null) return;
+    if (attackerCard && voluntad < attackerCard.cost) {
+      setShowVoluntadWarning(true);
+      return;
+    }
     gameState.attackDirectly(true, selectedAttackerIndex);
     setSelectedAttackerIndex(null);
   };
@@ -144,12 +157,13 @@ const Game: React.FC = () => {
 
   const selectedHandCard = selectedHandCardIndex !== null ? hand[selectedHandCardIndex] : null;
   const selectedIsJoker = selectedHandCard !== null && selectedHandCard.suit === 'jokers';
-  const canAffordSelected = selectedHandCard !== null && voluntad >= selectedHandCard.cost;
+  const canAffordSelected = selectedHandCard !== null;
 
   const attackerCard = selectedAttackerIndex !== null ? board[selectedAttackerIndex]?.card : null;
 
   const isOpponentSlotActiveToAttack = (slotIndex: number) => {
     if (selectedAttackerIndex === null || !attackerCard) return false;
+    if (voluntad < attackerCard.cost) return false; // Voluntad insuficiente para atacar
 
     // Solo asesino, tanque, tirador, pícaro, mago y sota pueden elegir a qué carta pegar
     const TARGETING_ROLES = ['ASESINO', 'TANQUE', 'TIRADOR', 'PICARO', 'MAGO', 'SOTA'];
@@ -168,7 +182,8 @@ const Game: React.FC = () => {
   const canAttackDirectly = () => {
     if (selectedAttackerIndex === null || !attackerCard) return false;
     if (attackerCard.attackType === 'SOPORTE') return false; // Curanderos/Clérigos no atacan cara
-    
+    if (voluntad < attackerCard.cost) return false; // Voluntad insuficiente para atacar
+
     const TARGETING_ROLES = ['ASESINO', 'TANQUE', 'TIRADOR', 'PICARO', 'MAGO', 'SOTA'];
     const hasOpponentCards = opponentBoard.some(s => s.card);
 
@@ -241,7 +256,7 @@ const Game: React.FC = () => {
 
         <div className="flex justify-around items-center w-full max-w-2xl gap-4 md:gap-12">
           <div
-            onClick={canAttackDirectly() ? handleAttackDirectly : undefined}
+            onClick={selectedAttackerIndex !== null ? handleAttackDirectly : undefined}
             className={`flex flex-col items-center flex-1 transition-all duration-300 ${canAttackDirectly() ? 'cursor-crosshair scale-105 border border-red-500/40 p-1 bg-red-950/20 rounded shadow-[0_0_15px_rgba(220,38,38,0.2)] animate-pulse' : ''}`}
           >
             <span className="text-[7px] md:text-[9px] text-red-500/80 uppercase tracking-[0.2em] mb-0.5">Oponente {!isPlayerTurn && '(Pensando...)'} {selectedAttackerIndex !== null && '🎯 ATACAR'}</span>
@@ -397,6 +412,26 @@ const Game: React.FC = () => {
                 <div className="p-4 bg-surface border border-accent-gray/20 rounded-xl italic text-secondary-theme">"{viewingCard.effect}"</div>
                 <button onClick={() => setViewingCard(null)} className="md:hidden w-full py-3 bg-white/10 uppercase tracking-widest text-[10px] font-bold">Cerrar</button>
               </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* AVISO DE VOLUNTAD INSUFICIENTE */}
+      <AnimatePresence>
+        {showVoluntadWarning && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="fixed bottom-32 left-1/2 -translate-x-1/2 z-150 pointer-events-none"
+          >
+            <div className="flex items-center gap-2 bg-black/90 border border-primary-gold/40 rounded-lg px-4 py-2.5 shadow-[0_0_20px_rgba(166,138,100,0.2)] backdrop-blur-md">
+              <span className="text-primary-gold text-lg font-black">⚡</span>
+              <span className="text-primary-gold font-bold uppercase tracking-widest text-[10px] md:text-xs whitespace-nowrap">
+                Voluntad insuficiente
+              </span>
             </div>
           </motion.div>
         )}
