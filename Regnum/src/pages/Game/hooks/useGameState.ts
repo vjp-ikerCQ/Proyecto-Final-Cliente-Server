@@ -39,6 +39,10 @@ export const useGameState = () => {
   const [playerAttackedIndices, setPlayerAttackedIndices] = useState<number[]>([]);
   const [opponentAttackedIndices, setOpponentAttackedIndices] = useState<number[]>([]);
 
+  // Rastreo de objetivos atacados por Magos en el turno actual (key: índice del mago, value: array de índices de objetivos atacados)
+  const [playerMagoAttacks, setPlayerMagoAttacks] = useState<Record<number, number[]>>({});
+  const [opponentMagoAttacks, setOpponentMagoAttacks] = useState<Record<number, number[]>>({});
+
   // Inicializar mazo
   const initializeGame = async () => {
     try {
@@ -184,8 +188,19 @@ export const useGameState = () => {
     }
   };
 
+  // Comprobar si un mago específico ya atacó a un objetivo en el turno actual
+  const hasMagoAttackedTarget = (isPlayer: boolean, magoIndex: number, targetIndex: number): boolean => {
+    const magoAttacksMap = isPlayer ? playerMagoAttacks : opponentMagoAttacks;
+    const previousTargets = magoAttacksMap[magoIndex] || [];
+    return previousTargets.includes(targetIndex);
+  };
+
   // Lógica de ataque a una carta en tablero
   const attackCard = (isPlayer: boolean, attackerSlotIndex: number, targetSlotIndex: number) => {
+    // Verificar si el atacante ya atacó en este turno
+    const attackedIndices = isPlayer ? playerAttackedIndices : opponentAttackedIndices;
+    if (attackedIndices.includes(attackerSlotIndex)) return;
+
     const attackerBoard = isPlayer ? board : opponentBoard;
     const defenderBoard = isPlayer ? opponentBoard : board;
 
@@ -194,6 +209,15 @@ export const useGameState = () => {
     if (!attackerSlot.card || !targetSlot.card) return;
 
     const attackerCard = attackerSlot.card;
+
+    // Si es un mago, verificar que no ataque al mismo objetivo dos veces en el mismo turno
+    const isMago = attackerCard.role.toUpperCase() === 'MAGO';
+    if (isMago && hasMagoAttackedTarget(isPlayer, attackerSlotIndex, targetSlotIndex)) return;
+
+    // Determinar si ya realizó su primer ataque en este turno (para Magos)
+    const magoAttacksMap = isPlayer ? playerMagoAttacks : opponentMagoAttacks;
+    const previousTargets = magoAttacksMap[attackerSlotIndex] || [];
+    const hasAlreadyAttackedOnce = isMago && previousTargets.length > 0;
 
     // Si no es una de las cartas que pueden elegir a qué carta pegar, solo puede pegar a su propia columna
     if (!TARGETING_ROLES.includes(attackerCard.role.toUpperCase())) {
@@ -205,9 +229,9 @@ export const useGameState = () => {
     if (attackerCard.attackType === 'DIRECTO') return; // Reyes no atacan cartas
     if (attackerCard.attackType === 'COLUMNA' && attackerSlotIndex !== targetSlotIndex) return; // Restricción de columna
 
-    // Verificar voluntad suficiente para ejercer el ataque
+    // Verificar voluntad suficiente para ejercer el ataque (solo si es su primer ataque)
     const currentVoluntad = isPlayer ? voluntad : opponentVoluntad;
-    if (currentVoluntad < attackerCard.cost) return;
+    if (!hasAlreadyAttackedOnce && currentVoluntad < attackerCard.cost) return;
 
     const damage = attackerCard.attack;
     let damageNum = 0;
@@ -242,28 +266,65 @@ export const useGameState = () => {
       setDefenderHp(prev => Math.max(0, prev - damageNum));
     }
 
-    // Descontar coste de voluntad del atacante
-    const setAttackerVoluntad = isPlayer ? setVoluntad : setOpponentVoluntad;
-    setAttackerVoluntad(v => v - attackerCard.cost);
+    // Descontar coste de voluntad del atacante (solo si es su primer ataque)
+    if (!hasAlreadyAttackedOnce) {
+      const setAttackerVoluntad = isPlayer ? setVoluntad : setOpponentVoluntad;
+      setAttackerVoluntad(v => v - attackerCard.cost);
 
-    // Habilidad de Asesino de Oros (Rank 2) -> +1 de voluntad
-    if (attackerCard.rank === 2 && attackerCard.suit === 'oros') {
-      setAttackerVoluntad(v => Math.min(10, v + 1));
+      // Habilidad de Asesino de Oros (Rank 2) -> +1 de voluntad
+      if (attackerCard.rank === 2 && attackerCard.suit === 'oros') {
+        setAttackerVoluntad(v => Math.min(10, v + 1));
+      }
     }
 
     // Habilidad de Tirador de Oros (Rank 7) al eliminar -> +2 de voluntad
     if (attackerCard.rank === 7 && attackerCard.suit === 'oros' && remainingHealth <= 0) {
+      const setAttackerVoluntad = isPlayer ? setVoluntad : setOpponentVoluntad;
       setAttackerVoluntad(v => Math.min(10, v + 2));
+    }
+
+    // Registrar la acción de ataque
+    if (isMago) {
+      const setMagoAttacksMap = isPlayer ? setPlayerMagoAttacks : setOpponentMagoAttacks;
+      const newTargetsCount = previousTargets.length + 1;
+
+      setMagoAttacksMap(prev => ({
+        ...prev,
+        [attackerSlotIndex]: [...(prev[attackerSlotIndex] || []), targetSlotIndex]
+      }));
+
+      // Si ya atacó a 2 objetivos distintos, marcar como que ya actuó
+      if (newTargetsCount >= 2) {
+        const setAttackerAttackedIndices = isPlayer ? setPlayerAttackedIndices : setOpponentAttackedIndices;
+        setAttackerAttackedIndices(old => [...old, attackerSlotIndex]);
+      }
+    } else {
+      // Cartas normales gastan su acción inmediatamente
+      const setAttackerAttackedIndices = isPlayer ? setPlayerAttackedIndices : setOpponentAttackedIndices;
+      setAttackerAttackedIndices(prev => [...prev, attackerSlotIndex]);
     }
   };
 
   // Lógica de ataque directo al rival
   const attackDirectly = (isPlayer: boolean, attackerSlotIndex: number) => {
+    // Verificar si el atacante ya atacó en este turno
+    const attackedIndices = isPlayer ? playerAttackedIndices : opponentAttackedIndices;
+    if (attackedIndices.includes(attackerSlotIndex)) return;
+
     const attackerBoard = isPlayer ? board : opponentBoard;
     const attackerSlot = attackerBoard[attackerSlotIndex];
     if (!attackerSlot.card) return;
 
     const attackerCard = attackerSlot.card;
+
+    // Si es un mago, verificar que no ataque al mismo objetivo (la cara) dos veces en el mismo turno
+    const isMago = attackerCard.role.toUpperCase() === 'MAGO';
+    if (isMago && hasMagoAttackedTarget(isPlayer, attackerSlotIndex, -1)) return;
+
+    // Determinar si ya realizó su primer ataque en este turno (para Magos)
+    const magoAttacksMap = isPlayer ? playerMagoAttacks : opponentMagoAttacks;
+    const previousTargets = magoAttacksMap[attackerSlotIndex] || [];
+    const hasAlreadyAttackedOnce = isMago && previousTargets.length > 0;
 
     // Restricciones de ataque directo
     if (attackerCard.attackType === 'SOPORTE') return;
@@ -280,9 +341,9 @@ export const useGameState = () => {
       return;
     }
 
-    // Verificar voluntad suficiente para ejercer el ataque
+    // Verificar voluntad suficiente para ejercer el ataque (solo si es su primer ataque)
     const currentVoluntad = isPlayer ? voluntad : opponentVoluntad;
-    if (currentVoluntad < attackerCard.cost) return;
+    if (!hasAlreadyAttackedOnce && currentVoluntad < attackerCard.cost) return;
 
     const damage = attackerCard.attack;
     let damageNum = 0;
@@ -300,13 +361,36 @@ export const useGameState = () => {
     const setDefenderHp = isPlayer ? setOpponentHp : setHp;
     setDefenderHp(prev => Math.max(0, prev - damageNum));
 
-    // Descontar coste de voluntad del atacante
-    const setAttackerVoluntad = isPlayer ? setVoluntad : setOpponentVoluntad;
-    setAttackerVoluntad(v => v - attackerCard.cost);
+    // Descontar coste de voluntad del atacante (solo si es su primer ataque)
+    if (!hasAlreadyAttackedOnce) {
+      const setAttackerVoluntad = isPlayer ? setVoluntad : setOpponentVoluntad;
+      setAttackerVoluntad(v => v - attackerCard.cost);
 
-    // Habilidad de Asesino de Oros (Rank 2) al atacar -> +1 de voluntad
-    if (attackerCard.rank === 2 && attackerCard.suit === 'oros') {
-      setAttackerVoluntad(v => Math.min(10, v + 1));
+      // Habilidad de Asesino de Oros (Rank 2) al atacar -> +1 de voluntad
+      if (attackerCard.rank === 2 && attackerCard.suit === 'oros') {
+        setAttackerVoluntad(v => Math.min(10, v + 1));
+      }
+    }
+
+    // Registrar la acción de ataque
+    if (isMago) {
+      const setMagoAttacksMap = isPlayer ? setPlayerMagoAttacks : setOpponentMagoAttacks;
+      const newTargetsCount = previousTargets.length + 1;
+
+      setMagoAttacksMap(prev => ({
+        ...prev,
+        [attackerSlotIndex]: [...(prev[attackerSlotIndex] || []), -1]
+      }));
+
+      // Si ya atacó a 2 objetivos distintos, marcar como que ya actuó
+      if (newTargetsCount >= 2) {
+        const setAttackerAttackedIndices = isPlayer ? setPlayerAttackedIndices : setOpponentAttackedIndices;
+        setAttackerAttackedIndices(old => [...old, attackerSlotIndex]);
+      }
+    } else {
+      // Cartas normales gastan su acción inmediatamente
+      const setAttackerAttackedIndices = isPlayer ? setPlayerAttackedIndices : setOpponentAttackedIndices;
+      setAttackerAttackedIndices(prev => [...prev, attackerSlotIndex]);
     }
   };
 
@@ -377,6 +461,7 @@ export const useGameState = () => {
         setHp(prev => Math.max(0, prev - 10));
       }
       setPlayerAttackedIndices([]);
+      setPlayerMagoAttacks({}); // Reset magos del jugador
       setIsPlayerTurn(false);
     } else {
       const bonus = clerigoPassiveBonus(opponentBoard);
@@ -385,6 +470,7 @@ export const useGameState = () => {
         setOpponentHp(prev => Math.max(0, prev - 10));
       }
       setOpponentAttackedIndices([]);
+      setOpponentMagoAttacks({}); // Reset magos del oponente
       setIsPlayerTurn(true);
     }
   };
@@ -420,6 +506,9 @@ export const useGameState = () => {
     attackDirectly,
     healCard,
     playerAttackedIndices,
-    opponentAttackedIndices
+    opponentAttackedIndices,
+    playerMagoAttacks,
+    opponentMagoAttacks,
+    hasMagoAttackedTarget
   };
 };

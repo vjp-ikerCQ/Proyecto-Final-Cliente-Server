@@ -43,7 +43,9 @@ const Game: React.FC = () => {
     setOpponentHand,
     setDeck,
     setOpponentVoluntad,
-    setOpponentBoard
+    setOpponentBoard,
+    playerMagoAttacks,
+    hasMagoAttackedTarget
   } = gameState;
 
   useBotAI({
@@ -125,10 +127,21 @@ const Game: React.FC = () => {
     const slot = opponentBoard[slotIndex];
     if (selectedAttackerIndex !== null && slot.card) {
       if (isOpponentSlotActiveToAttack(slotIndex)) {
+        const isMago = attackerCard?.role.toUpperCase() === 'MAGO';
+        const magoAttacksCount = (playerMagoAttacks[selectedAttackerIndex] || []).length;
+        
         gameState.attackCard(true, selectedAttackerIndex, slotIndex);
-        setSelectedAttackerIndex(null);
+        
+        // Deseleccionar al atacante si no es un Mago, o si ya ha realizado su segundo ataque
+        if (!isMago || magoAttacksCount >= 1) {
+          setSelectedAttackerIndex(null);
+        }
       } else if (attackerCard && voluntad < attackerCard.cost) {
-        setShowVoluntadWarning(true);
+        const isMago = attackerCard.role.toUpperCase() === 'MAGO';
+        const hasAlreadyAttackedOnce = isMago && (playerMagoAttacks[selectedAttackerIndex] || []).length > 0;
+        if (!hasAlreadyAttackedOnce) {
+          setShowVoluntadWarning(true);
+        }
       }
     } else {
       if (slot.card) {
@@ -143,8 +156,15 @@ const Game: React.FC = () => {
       setShowVoluntadWarning(true);
       return;
     }
+    const isMago = attackerCard?.role.toUpperCase() === 'MAGO';
+    const magoAttacksCount = (playerMagoAttacks[selectedAttackerIndex] || []).length;
+
     gameState.attackDirectly(true, selectedAttackerIndex);
-    setSelectedAttackerIndex(null);
+
+    // Deseleccionar al atacante si no es un Mago, o si ya ha realizado su segundo ataque
+    if (!isMago || magoAttacksCount >= 1) {
+      setSelectedAttackerIndex(null);
+    }
   };
 
   const handleUseJoker = () => {
@@ -167,7 +187,17 @@ const Game: React.FC = () => {
 
   const isOpponentSlotActiveToAttack = (slotIndex: number) => {
     if (selectedAttackerIndex === null || !attackerCard) return false;
-    if (voluntad < attackerCard.cost) return false; // Voluntad insuficiente para atacar
+
+    const isMago = attackerCard.role.toUpperCase() === 'MAGO';
+    const hasAlreadyAttackedOnce = isMago && (playerMagoAttacks[selectedAttackerIndex] || []).length > 0;
+    
+    // Solo verificar costo si no es el segundo ataque de un mago
+    if (!hasAlreadyAttackedOnce && voluntad < attackerCard.cost) return false; 
+
+    // Si el atacante es un mago, verificar que no haya atacado a este mismo objetivo en este turno
+    if (isMago) {
+      if (hasMagoAttackedTarget(true, selectedAttackerIndex, slotIndex)) return false;
+    }
 
     // Solo asesino, tanque, tirador, pícaro, mago y sota pueden elegir a qué carta pegar
     const TARGETING_ROLES = ['ASESINO', 'TANQUE', 'TIRADOR', 'PICARO', 'MAGO', 'SOTA'];
@@ -186,7 +216,17 @@ const Game: React.FC = () => {
   const canAttackDirectly = () => {
     if (selectedAttackerIndex === null || !attackerCard) return false;
     if (attackerCard.attackType === 'SOPORTE') return false; // Curanderos/Clérigos no atacan cara
-    if (voluntad < attackerCard.cost) return false; // Voluntad insuficiente para atacar
+
+    const isMago = attackerCard.role.toUpperCase() === 'MAGO';
+    const hasAlreadyAttackedOnce = isMago && (playerMagoAttacks[selectedAttackerIndex] || []).length > 0;
+
+    // Solo verificar costo si no es el segundo ataque de un mago
+    if (!hasAlreadyAttackedOnce && voluntad < attackerCard.cost) return false; 
+
+    // Si el atacante es un mago, verificar que no haya atacado la cara en este turno
+    if (isMago) {
+      if (hasMagoAttackedTarget(true, selectedAttackerIndex, -1)) return false;
+    }
 
     const TARGETING_ROLES = ['ASESINO', 'TANQUE', 'TIRADOR', 'PICARO', 'MAGO', 'SOTA'];
     const hasOpponentCards = opponentBoard.some(s => s.card);
