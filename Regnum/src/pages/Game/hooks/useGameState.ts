@@ -138,6 +138,36 @@ export const useGameState = () => {
     }
   };
 
+  const applyStartDmg = (card: CardData, slotIndex: number, isPlayer: boolean) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cardAny = card as any;
+
+    const isStartDmg = card.playEffect === 'start_dmg'
+      || card.effect === 'start_dmg'
+      || cardAny.efecto === 'start_dmg';
+
+    // Busca cantidad_efecto en: playAmount → top-level → habilidad → fallback 0
+    const rawAmount = card.playAmount
+      ?? cardAny.cantidad_efecto
+      ?? cardAny.habilidad?.cantidad_efecto
+      ?? 0;
+    const amount = typeof rawAmount === 'number' ? rawAmount : Number(rawAmount) || 0;
+
+    if (!isStartDmg || amount <= 0) return;
+
+    const targetBoard = isPlayer ? opponentBoard : board;
+    const setTargetBoard = isPlayer ? setOpponentBoard : setBoard;
+    const targetSlot = targetBoard[slotIndex];
+
+    if (!targetSlot.card) return;
+    const newBoard = [...targetBoard];
+    const remaining = targetSlot.card.health - amount;
+    newBoard[slotIndex] = remaining <= 0
+      ? { card: null, stack: [] }
+      : { ...targetSlot, card: { ...targetSlot.card, health: remaining } };
+    setTargetBoard(newBoard);
+  };
+
   // Jugar carta en tablero (jugador o bot)
   const playCard = (isPlayer: boolean, slotIndex: number, handCardIndex: number) => {
     if (isPlayer) {
@@ -149,6 +179,7 @@ export const useGameState = () => {
         newBoard[slotIndex] = { card, stack: [card] };
         setBoard(newBoard);
         setHand(prev => prev.filter((_, i) => i !== handCardIndex));
+        applyStartDmg(card, slotIndex, true);
       }
     } else {
       const card = opponentHand[handCardIndex];
@@ -159,6 +190,7 @@ export const useGameState = () => {
         newBoard[slotIndex] = { card, stack: [card] };
         setOpponentBoard(newBoard);
         setOpponentHand(prev => prev.filter((_, i) => i !== handCardIndex));
+        applyStartDmg(card, slotIndex, false);
       }
     }
   };
