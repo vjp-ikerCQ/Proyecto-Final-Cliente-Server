@@ -73,8 +73,8 @@ const generateCartas = () => {
                     effect = `Mucha vida, poco daño elige objetivo${suit === 'oros' ? ' + 1 de voluntad por ataque recibido' : ''}.`;
                     break;
                 case 5: // CLERIGO
-                    attack = 0;
-                    effect = 'Da voluntad al usuario.';
+                    attack = 1;
+                    effect = 'Pasivo: da 1 de voluntad extra al usuario al final de cada ronda.';
                     break;
                 case 6: // CURANDERO
                     attack = 0;
