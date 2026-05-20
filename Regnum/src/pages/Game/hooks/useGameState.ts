@@ -353,17 +353,27 @@ export const useGameState = () => {
     setAttackerAttackedIndices(prev => [...prev, healerSlotIndex]);
   };
 
+  const clerigoPassiveBonus = (slots: BoardSlot[]): number =>
+    slots.reduce((sum, slot) => {
+      if (slot.card && slot.card.rank === 5 && typeof slot.card.attack === 'number') {
+        return sum + slot.card.attack;
+      }
+      return sum;
+    }, 0);
+
   // Finalizar turno (jugador o bot)
   const endTurn = (isPlayer: boolean) => {
     if (isPlayer) {
-      setVoluntad(v => Math.min(v + 2, 10));
+      const bonus = clerigoPassiveBonus(board);
+      setVoluntad(v => Math.min(v + 2 + bonus, 10));
       if (board.filter(s => s.card).length === 0) {
         setHp(prev => Math.max(0, prev - 10));
       }
       setPlayerAttackedIndices([]);
       setIsPlayerTurn(false);
     } else {
-      setOpponentVoluntad(v => Math.min(v + 2, 10));
+      const bonus = clerigoPassiveBonus(opponentBoard);
+      setOpponentVoluntad(v => Math.min(v + 2 + bonus, 10));
       if (opponentBoard.filter(s => s.card).length === 0) {
         setOpponentHp(prev => Math.max(0, prev - 10));
       }
