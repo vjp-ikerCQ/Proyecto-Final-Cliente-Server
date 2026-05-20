@@ -71,7 +71,9 @@ const getCards = async (req, res) => {
                 attackType: targetToAttackType[carta.habilidad?.target] || carta.tipo_ataque || 'OBJETIVO',
                 effect: carta.habilidad?.efecto || '',
                 keyword: carta.keyword || '',
-                image: carta.imagen_url || imageUrl
+                image: carta.imagen_url || imageUrl,
+                playEffect: carta.efecto ?? undefined,
+                playAmount: carta.cantidad_efecto != null ? Number(carta.cantidad_efecto) : undefined
             };
         });
 
@@ -138,7 +140,9 @@ const getShuffledDeck = async (req, res) => {
                 attackType: targetToAttackType[carta.habilidad?.target] || carta.tipo_ataque || 'OBJETIVO',
                 effect: carta.habilidad?.efecto || '',
                 keyword: carta.keyword || '',
-                image: carta.imagen_url || imageUrl
+                image: carta.imagen_url || imageUrl,
+                playEffect: carta.efecto ?? undefined,
+                playAmount: carta.cantidad_efecto != null ? Number(carta.cantidad_efecto) : undefined
             };
         });
 

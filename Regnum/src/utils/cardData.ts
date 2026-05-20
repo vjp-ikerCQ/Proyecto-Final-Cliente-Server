@@ -16,6 +16,8 @@ export interface CardData {
   maxHealth?: number;      // Vida máxima original de la carta
   keyword?: string;        // Palabra clave (VENENO, VAMPIRO, etc.)
   descripcion?: string;    // Texto descriptivo visible en la galería
+  playEffect?: string;     // Efecto al entrar al tablero (ej: "start_dmg")
+  playAmount?: number;     // Cantidad asociada al efecto de entrada
 }
 
 /**
