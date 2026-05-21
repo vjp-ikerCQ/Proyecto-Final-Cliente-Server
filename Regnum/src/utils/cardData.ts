@@ -18,6 +18,10 @@ export interface CardData {
   descripcion?: string;    // Texto descriptivo visible en la galería
   playEffect?: string;     // Efecto al entrar al tablero (ej: "start_dmg")
   playAmount?: number;     // Cantidad asociada al efecto de entrada
+  // --- Estado en juego (runtime) ---
+  shield?: boolean;        // Escudo activo (reduce 1 dmg recibido, desaparece al recibir golpe)
+  poisonTurns?: number;    // Turnos de veneno restantes (1 dmg/turno)
+  bleedTurns?: number;     // Turnos de sangrado restantes (+1 dmg al siguiente golpe recibido)
 }
 
 /**

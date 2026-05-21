@@ -12,7 +12,7 @@ export interface BoardSlot {
 export const useGameState = () => {
   // Estado del Jugador
   const [voluntad, setVoluntad] = useState(10);
-  const [hp, setHp] = useState(100);
+  const [hp, setHp] = useState(30);
   const [hand, setHand] = useState<CardData[]>([]);
   const [board, setBoard] = useState<BoardSlot[]>([
     { card: null, stack: [] },
@@ -21,7 +21,7 @@ export const useGameState = () => {
   ]);
 
   // Estado del Oponente
-  const [opponentHp, setOpponentHp] = useState(100);
+  const [opponentHp, setOpponentHp] = useState(30);
   const [opponentVoluntad, setOpponentVoluntad] = useState(10);
   const [opponentHand, setOpponentHand] = useState<CardData[]>([]);
   const [opponentBoard, setOpponentBoard] = useState<BoardSlot[]>([
@@ -42,6 +42,10 @@ export const useGameState = () => {
   // Rastreo de objetivos atacados por Magos en el turno actual (key: índice del mago, value: array de índices de objetivos atacados)
   const [playerMagoAttacks, setPlayerMagoAttacks] = useState<Record<number, number[]>>({});
   const [opponentMagoAttacks, setOpponentMagoAttacks] = useState<Record<number, number[]>>({});
+
+  // Descarte (máximo 1 por ronda, coste 0)
+  const [playerHasDiscarded, setPlayerHasDiscarded] = useState(false);
+  const [discardPile, setDiscardPile] = useState<CardData[]>([]);
 
   // Inicializar mazo
   const initializeGame = async () => {
@@ -220,6 +224,17 @@ export const useGameState = () => {
     }
   };
 
+  // Descartar una carta de la mano (solo jugador, máx 1 por ronda, coste 0)
+  const discardCard = (isPlayer: boolean, handCardIndex: number) => {
+    if (!isPlayer) return;
+    if (playerHasDiscarded) return;
+    const card = hand[handCardIndex];
+    if (!card) return;
+    setHand(prev => prev.filter((_, i) => i !== handCardIndex));
+    setDiscardPile(prev => [...prev, card]);
+    setPlayerHasDiscarded(true);
+  };
+
   // Comprobar si un mago específico ya atacó a un objetivo en el turno actual
   const hasMagoAttackedTarget = (isPlayer: boolean, magoIndex: number, targetIndex: number): boolean => {
     const magoAttacksMap = isPlayer ? playerMagoAttacks : opponentMagoAttacks;
@@ -265,37 +280,47 @@ export const useGameState = () => {
     const currentVoluntad = isPlayer ? voluntad : opponentVoluntad;
     if (!hasAlreadyAttackedOnce && currentVoluntad < attackerCard.cost) return;
 
-    const damage = attackerCard.attack;
+    const isHalf = attackerCard.effect === 'half' || attackerCard.attack === '1/2';
+    const targetHealth = targetSlot.card.health;
     let damageNum = 0;
-    if (typeof damage === 'number') {
-      damageNum = damage;
-    } else if (typeof damage === 'string') {
-      if (damage === '1/2') {
-        damageNum = Math.floor(targetSlot.card.health / 2);
-      } else {
-        damageNum = parseInt(damage, 10) || 0;
-      }
+
+    if (isHalf) {
+      // HP=1 siempre muere; resto: daño = floor(HP/2), vida restante = ceil(HP/2)
+      damageNum = targetHealth <= 1 ? targetHealth : Math.floor(targetHealth / 2);
+    } else if (typeof attackerCard.attack === 'number') {
+      damageNum = attackerCard.attack;
+    } else if (typeof attackerCard.attack === 'string') {
+      damageNum = parseInt(attackerCard.attack, 10) || 0;
     }
 
-    const remainingHealth = targetSlot.card.health - damageNum;
+    // Modificadores de estado sobre el objetivo (escudo y sangrado)
+    const targetCard = targetSlot.card;
+    let effectiveDamage = damageNum;
+    if (targetCard.shield) effectiveDamage = Math.max(0, effectiveDamage - 1);
+    if ((targetCard.bleedTurns ?? 0) > 0) effectiveDamage += 1;
 
-    // Actualizar tablero defensor
+    const remainingHealth = targetHealth - effectiveDamage;
+
+    // Actualizar tablero defensor con efectos de estado
     const setDefenderBoard = isPlayer ? setOpponentBoard : setBoard;
     const newDefenderBoard = [...defenderBoard];
     if (remainingHealth <= 0) {
       newDefenderBoard[targetSlotIndex] = { card: null, stack: [] };
     } else {
-      newDefenderBoard[targetSlotIndex] = {
-        ...targetSlot,
-        card: { ...targetSlot.card, health: remainingHealth }
-      };
+      let updatedTarget: CardData = { ...targetCard, health: remainingHealth };
+      if (targetCard.shield) updatedTarget = { ...updatedTarget, shield: false };
+      if ((targetCard.bleedTurns ?? 0) > 0) updatedTarget = { ...updatedTarget, bleedTurns: 0 };
+      if (attackerCard.effect === 'poison') updatedTarget = { ...updatedTarget, poisonTurns: 3 };
+      if (attackerCard.effect === 'bleed')  updatedTarget = { ...updatedTarget, bleedTurns: 2 };
+      newDefenderBoard[targetSlotIndex] = { ...targetSlot, card: updatedTarget };
     }
     setDefenderBoard(newDefenderBoard);
 
-    // Efecto perforante (Tirador) -> Daño directo a la vida del rival
-    if (attackerCard.attackType === 'PERFORAR') {
+    // Efecto perforante -> Daño al jugador rival (daño total - 1)
+    const isPierce = attackerCard.effect === 'pierce' || attackerCard.attackType === 'PERFORAR';
+    if (isPierce) {
       const setDefenderHp = isPlayer ? setOpponentHp : setHp;
-      setDefenderHp(prev => Math.max(0, prev - damageNum));
+      setDefenderHp(prev => Math.max(0, prev - Math.max(0, damageNum - 1)));
     }
 
     // Descontar coste de voluntad del atacante (solo si es su primer ataque)
@@ -313,6 +338,25 @@ export const useGameState = () => {
     if (attackerCard.rank === 7 && attackerCard.suit === 'oros' && remainingHealth <= 0) {
       const setAttackerVoluntad = isPlayer ? setVoluntad : setOpponentVoluntad;
       setAttackerVoluntad(v => Math.min(10, v + 2));
+    }
+
+    // steal_shield: la carta atacante gana escudo al asestar un golpe
+    if (attackerCard.effect === 'steal_shield') {
+      const setAttackerBoardFn = isPlayer ? setBoard : setOpponentBoard;
+      setAttackerBoardFn(prev => {
+        const updated = [...prev];
+        const slot = updated[attackerSlotIndex];
+        if (slot.card) updated[attackerSlotIndex] = { ...slot, card: { ...slot.card, shield: true } };
+        return updated;
+      });
+    }
+
+    // steal_will: rival -1 voluntad, atacante +1 voluntad
+    if (attackerCard.effect === 'steal_will') {
+      const setAttVol = isPlayer ? setVoluntad : setOpponentVoluntad;
+      const setDefVol = isPlayer ? setOpponentVoluntad : setVoluntad;
+      setAttVol(v => Math.min(10, v + 1));
+      setDefVol(v => Math.max(0, v - 1));
     }
 
     // Registrar la acción de ataque
@@ -367,6 +411,10 @@ export const useGameState = () => {
     // COLUMNA: solo puede atacar directo si su columna específica está vacía
     if (attackerCard.attackType === 'COLUMNA') {
       if (defenderBoard[attackerSlotIndex].card) return;
+    } else if (isMago) {
+      // Mago puede atacar al jugador solo si el rival tiene menos de 2 cartas en mesa
+      const defenderCardCount = defenderBoard.filter(s => s.card).length;
+      if (defenderCardCount >= 2) return;
     } else if (TARGETING_ROLES.includes(attackerCard.role.toUpperCase())) {
       if (hasDefenderCards) return;
     } else if (attackerCard.attackType !== 'DIRECTO' && hasDefenderCards) {
@@ -377,17 +425,15 @@ export const useGameState = () => {
     const currentVoluntad = isPlayer ? voluntad : opponentVoluntad;
     if (!hasAlreadyAttackedOnce && currentVoluntad < attackerCard.cost) return;
 
-    const damage = attackerCard.attack;
+    const isHalf = attackerCard.effect === 'half' || attackerCard.attack === '1/2';
     let damageNum = 0;
-    const defenderHp = isPlayer ? opponentHp : hp;
-    if (typeof damage === 'number') {
-      damageNum = damage;
-    } else if (typeof damage === 'string') {
-      if (damage === '1/2') {
-        damageNum = Math.floor(defenderHp / 2);
-      } else {
-        damageNum = parseInt(damage, 10) || 0;
-      }
+
+    if (isHalf) {
+      damageNum = 5; // Daño fijo al atacar al jugador directamente
+    } else if (typeof attackerCard.attack === 'number') {
+      damageNum = attackerCard.attack;
+    } else if (typeof attackerCard.attack === 'string') {
+      damageNum = parseInt(attackerCard.attack, 10) || 0;
     }
 
     const setDefenderHp = isPlayer ? setOpponentHp : setHp;
@@ -402,6 +448,25 @@ export const useGameState = () => {
       if (attackerCard.rank === 2 && attackerCard.suit === 'oros') {
         setAttackerVoluntad(v => Math.min(10, v + 1));
       }
+    }
+
+    // steal_shield: gana escudo al golpear al jugador rival
+    if (attackerCard.effect === 'steal_shield') {
+      const setAttackerBoardFn = isPlayer ? setBoard : setOpponentBoard;
+      setAttackerBoardFn(prev => {
+        const updated = [...prev];
+        const slot = updated[attackerSlotIndex];
+        if (slot.card) updated[attackerSlotIndex] = { ...slot, card: { ...slot.card, shield: true } };
+        return updated;
+      });
+    }
+
+    // steal_will: rival -1 voluntad, atacante +1 voluntad al golpear directo
+    if (attackerCard.effect === 'steal_will') {
+      const setAttVol = isPlayer ? setVoluntad : setOpponentVoluntad;
+      const setDefVol = isPlayer ? setOpponentVoluntad : setVoluntad;
+      setAttVol(v => Math.min(10, v + 1));
+      setDefVol(v => Math.max(0, v - 1));
     }
 
     // Registrar la acción de ataque
@@ -486,24 +551,34 @@ export const useGameState = () => {
 
   // Finalizar turno (jugador o bot)
   const endTurn = (isPlayer: boolean) => {
+    // Aplica veneno (1 dmg/turno) y elimina sangrado en el tablero indicado
+    const applyTurnEndEffects = (prev: BoardSlot[]): BoardSlot[] =>
+      prev.map(slot => {
+        if (!slot.card) return slot;
+        let card = { ...slot.card };
+        if (card.poisonTurns && card.poisonTurns > 0) {
+          card = { ...card, health: card.health - 1, poisonTurns: card.poisonTurns - 1 };
+        }
+        if (card.bleedTurns && card.bleedTurns > 0) card = { ...card, bleedTurns: card.bleedTurns - 1 };
+        if (card.health <= 0) return { card: null, stack: [] };
+        return { ...slot, card };
+      });
+
     if (isPlayer) {
       const bonus = clerigoPassiveBonus(board);
       setVoluntad(v => Math.min(v + 2 + bonus, 10));
-      if (board.filter(s => s.card).length === 0) {
-        setHp(prev => Math.max(0, prev - 10));
-      }
       setPlayerAttackedIndices([]);
-      setPlayerMagoAttacks({}); // Reset magos del jugador
+      setPlayerMagoAttacks({});
+      setPlayerHasDiscarded(false);
       setIsPlayerTurn(false);
+      setOpponentBoard(applyTurnEndEffects);
     } else {
       const bonus = clerigoPassiveBonus(opponentBoard);
       setOpponentVoluntad(v => Math.min(v + 2 + bonus, 10));
-      if (opponentBoard.filter(s => s.card).length === 0) {
-        setOpponentHp(prev => Math.max(0, prev - 10));
-      }
       setOpponentAttackedIndices([]);
-      setOpponentMagoAttacks({}); // Reset magos del oponente
+      setOpponentMagoAttacks({});
       setIsPlayerTurn(true);
+      setBoard(applyTurnEndEffects);
     }
   };
 
@@ -541,6 +616,9 @@ export const useGameState = () => {
     opponentAttackedIndices,
     playerMagoAttacks,
     opponentMagoAttacks,
-    hasMagoAttackedTarget
+    hasMagoAttackedTarget,
+    playerHasDiscarded,
+    discardCard,
+    discardPile
   };
 };

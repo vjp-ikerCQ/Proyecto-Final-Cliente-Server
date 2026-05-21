@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Shield, Swords, Layers, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -6,6 +6,9 @@ import { type CardData } from '../../utils/cardData';
 import { useGameState, type BoardSlot } from './hooks/useGameState';
 import { useBotAI } from './hooks/useBotAI';
 import AtmosphereParticles from '../../components/AtmosphereParticles';
+import { updateMatchStats } from '../../services/userService';
+
+const MAX_HP = 30;
 
 /**
  * Colores representativos para cada palo
@@ -18,7 +21,11 @@ const suitColors = {
   jokers: '#a855f7',
 };
 
-const Game: React.FC = () => {
+interface GameProps {
+  user: { name: string; isGuest: boolean };
+}
+
+const Game: React.FC<GameProps> = ({ user }) => {
   const navigate = useNavigate();
 
   // Custom Hooks para estado y bot
@@ -45,7 +52,10 @@ const Game: React.FC = () => {
     setOpponentVoluntad,
     setOpponentBoard,
     playerMagoAttacks,
-    hasMagoAttackedTarget
+    hasMagoAttackedTarget,
+    playerHasDiscarded,
+    discardCard,
+    discardPile
   } = gameState;
 
   useBotAI({
@@ -68,7 +78,11 @@ const Game: React.FC = () => {
   const [viewingCard, setViewingCard] = useState<CardData | null>(null);
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
-  const [showVoluntadWarning, setShowVoluntadWarning] = useState(false);
+  const [warningText, setWarningText] = useState<string | null>(null);
+  const [draggingHandIndex, setDraggingHandIndex] = useState<number | null>(null);
+  const [isDragOverDiscard, setIsDragOverDiscard] = useState(false);
+  const [gameOver, setGameOver] = useState<'victory' | 'defeat' | null>(null);
+  const statsUpdated = useRef(false);
 
   useEffect(() => {
     if (voluntad < 5) {
@@ -79,10 +93,23 @@ const Game: React.FC = () => {
   }, [voluntad]);
 
   useEffect(() => {
-    if (!showVoluntadWarning) return;
-    const timer = setTimeout(() => setShowVoluntadWarning(false), 2000);
+    if (!warningText) return;
+    const timer = setTimeout(() => setWarningText(null), 2000);
     return () => clearTimeout(timer);
-  }, [showVoluntadWarning]);
+  }, [warningText]);
+
+  useEffect(() => {
+    if (isLoading || statsUpdated.current) return;
+    if (hp <= 0) {
+      statsUpdated.current = true;
+      setGameOver('defeat');
+      if (!user.isGuest) updateMatchStats(user.name, 'lose');
+    } else if (opponentHp <= 0) {
+      statsUpdated.current = true;
+      setGameOver('victory');
+      if (!user.isGuest) updateMatchStats(user.name, 'win');
+    }
+  }, [hp, opponentHp, isLoading]);
 
   // Manejadores específicos de la UI del jugador
   const handleDrawCard = () => {
@@ -107,7 +134,7 @@ const Game: React.FC = () => {
         if (attackerCard?.role === 'CURANDERO' && selectedAttackerIndex !== slotIndex) {
           // Es un curandero y hacemos clic en una carta aliada -> ¡CURAR!
           if (voluntad < attackerCard.cost) {
-            setShowVoluntadWarning(true);
+            setWarningText('Voluntad insuficiente');
             return;
           }
           healCard(true, selectedAttackerIndex, slotIndex);
@@ -140,7 +167,7 @@ const Game: React.FC = () => {
         const isMago = attackerCard.role.toUpperCase() === 'MAGO';
         const hasAlreadyAttackedOnce = isMago && (playerMagoAttacks[selectedAttackerIndex] || []).length > 0;
         if (!hasAlreadyAttackedOnce) {
-          setShowVoluntadWarning(true);
+          setWarningText('Voluntad insuficiente');
         }
       }
     } else {
@@ -152,12 +179,25 @@ const Game: React.FC = () => {
 
   const handleAttackDirectly = () => {
     if (selectedAttackerIndex === null) return;
-    if (attackerCard && voluntad < attackerCard.cost) {
-      setShowVoluntadWarning(true);
-      return;
-    }
+
     const isMago = attackerCard?.role.toUpperCase() === 'MAGO';
     const magoAttacksCount = (playerMagoAttacks[selectedAttackerIndex] || []).length;
+    const hasAlreadyAttackedOnce = isMago && magoAttacksCount > 0;
+
+    // El segundo ataque del Mago es gratuito (no requiere voluntad)
+    if (!hasAlreadyAttackedOnce && attackerCard && voluntad < attackerCard.cost) {
+      setWarningText('Voluntad insuficiente');
+      return;
+    }
+
+    // Si el Mago ya atacó al jugador esta ronda, ignorar el clic sin deseleccionar
+    if (isMago && hasMagoAttackedTarget(true, selectedAttackerIndex, -1)) return;
+
+    // Si el Mago ya atacó una carta y el rival tiene 2+ cartas, debe atacar cartas (no al jugador)
+    if (isMago && hasAlreadyAttackedOnce && opponentBoard.filter(s => s.card).length >= 2) {
+      setWarningText('El Mago debe atacar a 2 cartas');
+      return;
+    }
 
     gameState.attackDirectly(true, selectedAttackerIndex);
 
@@ -170,6 +210,21 @@ const Game: React.FC = () => {
   const handleUseJoker = () => {
     if (selectedHandCardIndex === null) return;
     useJoker(true, selectedHandCardIndex);
+    setSelectedHandCardIndex(null);
+  };
+
+  const handleDiscard = () => {
+    if (selectedHandCardIndex === null || playerHasDiscarded) return;
+    discardCard(true, selectedHandCardIndex);
+    setSelectedHandCardIndex(null);
+  };
+
+  const handleDiscardDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOverDiscard(false);
+    if (draggingHandIndex === null || playerHasDiscarded) return;
+    discardCard(true, draggingHandIndex);
+    setDraggingHandIndex(null);
     setSelectedHandCardIndex(null);
   };
 
@@ -215,36 +270,32 @@ const Game: React.FC = () => {
 
   const canAttackDirectly = () => {
     if (selectedAttackerIndex === null || !attackerCard) return false;
-    if (attackerCard.attackType === 'SOPORTE') return false; // Curanderos/Clérigos no atacan cara
+    if (attackerCard.attackType === 'SOPORTE') return false;
 
     const isMago = attackerCard.role.toUpperCase() === 'MAGO';
     const hasAlreadyAttackedOnce = isMago && (playerMagoAttacks[selectedAttackerIndex] || []).length > 0;
 
-    // Solo verificar costo si no es el segundo ataque de un mago
-    if (!hasAlreadyAttackedOnce && voluntad < attackerCard.cost) return false; 
+    if (!hasAlreadyAttackedOnce && voluntad < attackerCard.cost) return false;
 
-    // Si el atacante es un mago, verificar que no haya atacado la cara en este turno
     if (isMago) {
       if (hasMagoAttackedTarget(true, selectedAttackerIndex, -1)) return false;
+      // Mago solo puede atacar directo si el rival tiene menos de 2 cartas
+      return opponentBoard.filter(s => s.card).length < 2;
     }
 
-    const TARGETING_ROLES = ['ASESINO', 'TANQUE', 'TIRADOR', 'PICARO', 'MAGO', 'SOTA'];
+    const TARGETING_ROLES = ['ASESINO', 'TANQUE', 'TIRADOR', 'PICARO', 'SOTA'];
     const hasOpponentCards = opponentBoard.some(s => s.card);
 
-    // Si es una carta de daño a un solo objetivo, no puede atacar cara si hay cartas enemigas
     if (TARGETING_ROLES.includes(attackerCard.role.toUpperCase())) {
       if (hasOpponentCards) return false;
     }
 
-    // COLUMNA: puede atacar directo solo si su columna específica está vacía
     if (attackerCard.attackType === 'COLUMNA') {
       return !opponentBoard[selectedAttackerIndex].card;
     }
 
-    // DIRECTO: puede atacar siempre
     if (attackerCard.attackType === 'DIRECTO') return true;
 
-    // El resto: solo si no hay cartas enemigas
     return !hasOpponentCards;
   };
 
@@ -306,7 +357,7 @@ const Game: React.FC = () => {
           >
             <span className="text-[7px] md:text-[9px] text-red-500/80 uppercase tracking-[0.2em] mb-0.5">Oponente {!isPlayerTurn && '(Pensando...)'} {selectedAttackerIndex !== null && '🎯 ATACAR'}</span>
             <div className="w-full max-w-[120px] md:max-w-[180px] h-1.5 bg-red-950/30 rounded-full border border-red-900/20 relative overflow-hidden">
-              <motion.div className="absolute inset-0 bg-red-600 shadow-[0_0_8px_red]" animate={{ width: `${opponentHp}%` }} />
+              <motion.div className="absolute inset-0 bg-red-600 shadow-[0_0_8px_red]" animate={{ width: `${(opponentHp / MAX_HP) * 100}%` }} />
             </div>
             {/* Opcional: mostrar voluntad del oponente (útil para debug o gameplay) */}
             <span className="text-[6px] md:text-[8px] text-red-400 mt-1">Voluntad: {opponentVoluntad} / Mano: {opponentHand.length}</span>
@@ -317,7 +368,7 @@ const Game: React.FC = () => {
               Jugador {isPlayerTurn && '(Tu Turno)'}
             </span>
             <div className="w-full max-w-[120px] md:max-w-[180px] h-1.5 bg-blue-950/30 rounded-full border border-blue-900/20 relative overflow-hidden">
-              <motion.div className="absolute inset-0 bg-blue-500 shadow-[0_0_8px_blue]" animate={{ width: `${hp}%` }} />
+              <motion.div className="absolute inset-0 bg-blue-500 shadow-[0_0_8px_blue]" animate={{ width: `${(hp / MAX_HP) * 100}%` }} />
             </div>
           </div>
         </div>
@@ -379,16 +430,45 @@ const Game: React.FC = () => {
 
       {/* FOOTER: Mano y Controles */}
       <footer className={`relative z-20 p-2 md:p-3 bg-gradient-to-t from-black via-black/95 to-transparent flex flex-col md:flex-row justify-center items-center gap-2 md:gap-6 shrink-0 border-t border-white/5 overflow-visible transition-opacity duration-500 ${!isPlayerTurn ? 'opacity-50 pointer-events-none' : ''}`}>
-        <div className="flex items-center gap-3 md:gap-6 w-full md:w-auto justify-center overflow-visible">
-          <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={handleDrawCard}>
-            <div className="w-10 h-15 sm:w-14 sm:h-21 md:w-18 md:h-28 border border-white/10 rounded-md bg-[#080808] flex items-center justify-center group-hover:border-primary-gold/50 transition-all shadow-2xl relative overflow-hidden shrink-0">
-              <Layers className="text-white/10 group-hover:text-primary-gold/40 transition-colors" size={16} />
-              <div className="absolute inset-0 bg-gradient-to-tr from-primary-gold/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto justify-center overflow-visible">
+          {/* Mazo + Pila de Descartes */}
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={handleDrawCard}>
+              <div className="w-10 sm:w-14 md:w-16 aspect-[2/3] border border-white/10 rounded-md bg-[#080808] flex items-center justify-center group-hover:border-primary-gold/50 transition-all shadow-2xl relative overflow-hidden shrink-0">
+                <Layers className="text-white/10 group-hover:text-primary-gold/40 transition-colors" size={16} />
+                <div className="absolute inset-0 bg-gradient-to-tr from-primary-gold/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <span className="text-[6px] md:text-[8px] uppercase tracking-widest text-gray-500 font-bold">Mazo | 1v</span>
             </div>
-            <span className="text-[6px] md:text-[8px] uppercase tracking-widest text-gray-500 font-bold">Mazo | 1v</span>
+
+            {/* Pila de Descartes (zona de arrastre) */}
+            <div
+              onDragOver={(e) => { e.preventDefault(); if (!playerHasDiscarded) setIsDragOverDiscard(true); }}
+              onDragLeave={() => setIsDragOverDiscard(false)}
+              onDrop={handleDiscardDrop}
+              className={`flex flex-col items-center gap-1 transition-opacity ${playerHasDiscarded ? 'opacity-40' : ''}`}
+            >
+              <div className={`w-10 sm:w-14 md:w-16 aspect-[2/3] border rounded-md relative overflow-hidden shrink-0 transition-all ${
+                isDragOverDiscard && !playerHasDiscarded
+                  ? 'border-red-400 bg-red-950/30 shadow-[0_0_12px_rgba(239,68,68,0.3)]'
+                  : 'border-white/10 bg-[#080808]'
+              }`}>
+                {discardPile.length > 0 ? (
+                  <>
+                    <img src={discardPile[discardPile.length - 1].image} className="w-full h-full object-cover opacity-50" />
+                    <div className="absolute bottom-0 right-0 bg-black/80 text-white/60 text-[7px] px-1 font-bold">{discardPile.length}</div>
+                  </>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-white/10 text-lg">⊗</div>
+                )}
+              </div>
+              <span className="text-[6px] md:text-[8px] uppercase tracking-widest text-gray-500 font-bold">
+                {playerHasDiscarded ? 'Descartada ✓' : 'Descarte'}
+              </span>
+            </div>
           </div>
 
-          <div className="flex gap-1 md:gap-3 items-end px-1 md:px-4 pt-4 md:pt-6 pb-1 overflow-x-auto overflow-y-visible max-w-[85vw] md:max-w-none scrollbar-hide">
+          <div className="flex gap-1 md:gap-3 items-end px-1 md:px-4 pt-4 md:pt-6 pb-1 overflow-x-auto overflow-y-visible max-w-[75vw] md:max-w-none scrollbar-hide">
             <AnimatePresence>
               {hand.map((card, i) => (
                 <GameCard
@@ -400,13 +480,16 @@ const Game: React.FC = () => {
                     e.preventDefault();
                     setViewingCard(card);
                   }}
+                  draggable={!playerHasDiscarded}
+                  onDragStart={() => setDraggingHandIndex(i)}
+                  onDragEnd={() => setDraggingHandIndex(null)}
                 />
               ))}
             </AnimatePresence>
           </div>
         </div>
 
-        <div className="flex md:flex-col gap-2 md:gap-4 items-center w-full md:w-48 px-4 pb-2">
+        <div className="flex md:flex-col gap-2 md:gap-3 items-center w-full md:w-48 px-4 pb-2">
           <AnimatePresence mode="wait">
             {selectedIsJoker ? (
               <motion.button
@@ -428,6 +511,21 @@ const Game: React.FC = () => {
               </motion.button>
             )}
           </AnimatePresence>
+
+          {/* Botón DESCARTAR */}
+          <motion.button
+            onClick={handleDiscard}
+            disabled={selectedHandCardIndex === null || playerHasDiscarded}
+            className={`flex-1 md:w-full py-2.5 md:py-3 px-4 font-black uppercase tracking-widest rounded border text-[9px] md:text-xs text-center transition-all ${
+              playerHasDiscarded
+                ? 'bg-transparent text-gray-700 border-white/5 cursor-not-allowed'
+                : selectedHandCardIndex !== null
+                  ? 'bg-red-950/60 text-red-300 border-red-800/60 hover:bg-red-900/60 cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.15)]'
+                  : 'bg-transparent text-gray-600 border-white/10 cursor-not-allowed'
+            }`}
+          >
+            {playerHasDiscarded ? '✓ Descartada' : 'Descartar'}
+          </motion.button>
         </div>
       </footer>
 
@@ -462,10 +560,11 @@ const Game: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* AVISO DE VOLUNTAD INSUFICIENTE */}
+      {/* AVISOS DE JUEGO */}
       <AnimatePresence>
-        {showVoluntadWarning && (
+        {warningText && (
           <motion.div
+            key={warningText}
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -475,9 +574,70 @@ const Game: React.FC = () => {
             <div className="flex items-center gap-2 bg-black/90 border border-primary-gold/40 rounded-lg px-4 py-2.5 shadow-[0_0_20px_rgba(166,138,100,0.2)] backdrop-blur-md">
               <span className="text-primary-gold text-lg font-black">⚡</span>
               <span className="text-primary-gold font-bold uppercase tracking-widest text-[10px] md:text-xs whitespace-nowrap">
-                Voluntad insuficiente
+                {warningText}
               </span>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL FIN DE PARTIDA: VICTORIA / DERROTA */}
+      <AnimatePresence>
+        {gameOver && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, type: 'spring', stiffness: 200, damping: 20 }}
+              className={`relative w-full max-w-md text-center p-8 md:p-12 rounded-2xl border shadow-2xl overflow-hidden ${
+                gameOver === 'victory'
+                  ? 'bg-[#080e08] border-primary-gold/40 shadow-[0_0_60px_rgba(166,138,100,0.2)]'
+                  : 'bg-[#0e0808] border-red-900/40 shadow-[0_0_60px_rgba(220,38,38,0.15)]'
+              }`}
+            >
+              {/* Destellos de fondo */}
+              <div className={`absolute inset-0 opacity-5 pointer-events-none ${gameOver === 'victory' ? 'bg-primary-gold' : 'bg-red-600'}`} />
+
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.3, type: 'spring', stiffness: 300 }}
+                className={`text-6xl md:text-8xl font-black font-cinzel tracking-tighter mb-4 ${
+                  gameOver === 'victory' ? 'text-gold-gradient' : 'text-red-500'
+                }`}
+              >
+                {gameOver === 'victory' ? 'VICTORIA' : 'DERROTA'}
+              </motion.div>
+
+              <p className="text-gray-400 text-sm mb-10 font-spectral">
+                {gameOver === 'victory'
+                  ? 'Has derrotado a tu rival. El reino te pertenece.'
+                  : 'Tu ejército ha caído. El reino se ha perdido.'}
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => { navigate('/game'); window.location.reload(); }}
+                  className={`flex-1 py-3 px-6 font-black uppercase tracking-widest text-xs rounded border transition-all ${
+                    gameOver === 'victory'
+                      ? 'bg-primary-gold/10 text-primary-gold border-primary-gold/40 hover:bg-primary-gold/20'
+                      : 'bg-red-950/30 text-red-400 border-red-800/40 hover:bg-red-950/50'
+                  }`}
+                >
+                  Volver a jugar
+                </button>
+                <button
+                  onClick={() => navigate('/menu')}
+                  className="flex-1 py-3 px-6 bg-white/5 text-gray-300 font-black uppercase tracking-widest text-xs rounded border border-white/10 hover:bg-white/10 transition-all"
+                >
+                  Menú principal
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -514,7 +674,13 @@ const Game: React.FC = () => {
                   Seguir Luchando
                 </button>
                 <button
-                  onClick={() => navigate('/menu')}
+                  onClick={() => {
+                    if (!statsUpdated.current && !user.isGuest) {
+                      statsUpdated.current = true;
+                      updateMatchStats(user.name, 'lose');
+                    }
+                    navigate('/menu');
+                  }}
                   className="flex-1 py-3 px-6 bg-red-600 text-white rounded-lg uppercase tracking-widest text-xs font-black hover:bg-red-500 shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all"
                 >
                   Rendirse
@@ -533,13 +699,16 @@ const GameCard: React.FC<{
   isSelected?: boolean;
   onClick?: () => void;
   onRightClick?: (e: React.MouseEvent) => void;
-}> = ({ card, isSelected, onClick, onRightClick }) => {
+  draggable?: boolean;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+}> = ({ card, isSelected, onClick, onRightClick, draggable, onDragStart, onDragEnd }) => {
   return (
     <motion.div
       layout
       initial={{ opacity: 0, y: 30 }}
-      animate={{ 
-        opacity: 1, 
+      animate={{
+        opacity: 1,
         y: 0,
         scale: isSelected ? 1.1 : 1
       }}
@@ -551,6 +720,9 @@ const GameCard: React.FC<{
       `}
       onClick={onClick}
       onContextMenu={onRightClick}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
     >
       <div
         className={`w-full h-full relative rounded-md md:rounded-lg border-2 bg-[#080808] transition-all duration-500 
@@ -684,6 +856,27 @@ const BoardSlotView: React.FC<{
           {slot.stack.length > 1 && (
             <div className="absolute -bottom-1 -right-1 w-4 h-4 md:w-6 md:h-6 rounded bg-primary-gold text-black flex items-center justify-center font-black text-[8px] md:text-xs border border-black z-[60]">
               +{slot.stack.length - 1}
+            </div>
+          )}
+
+          {/* Indicadores de estado: escudo, veneno, sangrado */}
+          {(slot.card.shield || !!slot.card.poisonTurns || !!slot.card.bleedTurns) && (
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-40 flex flex-col gap-0.5 items-center pointer-events-none">
+              {slot.card.shield && (
+                <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-yellow-400 border border-yellow-200 flex items-center justify-center shadow-[0_0_6px_rgba(234,179,8,0.8)]" title="Escudo">
+                  <span className="text-[6px] md:text-[8px] leading-none select-none">🛡</span>
+                </div>
+              )}
+              {!!slot.card.poisonTurns && (
+                <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-purple-600 border border-purple-400 flex items-center justify-center shadow-[0_0_6px_rgba(147,51,234,0.8)]" title={`Veneno (${slot.card.poisonTurns} turnos)`}>
+                  <span className="text-[6px] md:text-[8px] leading-none select-none font-bold text-white">{slot.card.poisonTurns}</span>
+                </div>
+              )}
+              {!!slot.card.bleedTurns && (
+                <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-red-600 border border-red-400 flex items-center justify-center shadow-[0_0_6px_rgba(220,38,38,0.8)]" title="Sangrado">
+                  <span className="text-[6px] md:text-[8px] leading-none select-none">🩸</span>
+                </div>
+              )}
             </div>
           )}
         </motion.div>

@@ -72,11 +72,11 @@ function App() {
             />
 
             {/* Game Route */}
-            <Route 
-              path="/game" 
+            <Route
+              path="/game"
               element={
-                user ? <Game /> : <Navigate to="/" />
-              } 
+                user ? <Game user={user} /> : <Navigate to="/" />
+              }
             />
 
             {/* Default Redirect to Splash */}
