@@ -256,6 +256,11 @@ export const useGameState = () => {
     if (!attackerSlot.card || !targetSlot.card) return;
 
     const attackerCard = attackerSlot.card;
+    const isAsDeOros = attackerCard.rank === 1 && attackerCard.suit === 'oros';
+    const isAsDeCopas = attackerCard.rank === 1 && attackerCard.suit === 'copas';
+    const isAsDeEspadas = attackerCard.rank === 1 && attackerCard.suit === 'espadas';
+    const isAsDeBastos = attackerCard.rank === 1 && attackerCard.suit === 'bastos';
+    const isAreaAttack = isAsDeOros || isAsDeCopas || isAsDeBastos;
 
     // Si es un mago, verificar que no ataque al mismo objetivo dos veces en el mismo turno
     const isMago = attackerCard.role.toUpperCase() === 'MAGO';
@@ -267,13 +272,17 @@ export const useGameState = () => {
     const hasAlreadyAttackedOnce = isMago && previousTargets.length > 0;
 
     // Si no es una de las cartas que pueden elegir a qué carta pegar, solo puede pegar a su propia columna
-    if (!TARGETING_ROLES.includes(attackerCard.role.toUpperCase())) {
+    if (!TARGETING_ROLES.includes(attackerCard.role.toUpperCase()) && !isAreaAttack && !isAsDeEspadas) {
       if (attackerSlotIndex !== targetSlotIndex) return;
     }
 
     // Restricciones de combate según attackType
     if (attackerCard.attackType === 'SOPORTE') return; // Soporte no ataca
-    if (attackerCard.attackType === 'DIRECTO') return; // Reyes no atacan cartas
+    if (attackerCard.attackType === 'DIRECTO' || attackerCard.role.toUpperCase() === 'REY') {
+      // El Rey solo ataca al rival, redirigimos el ataque si intentan apuntar a una carta
+      attackDirectly(isPlayer, attackerSlotIndex);
+      return;
+    }
     if (attackerCard.attackType === 'COLUMNA' && attackerSlotIndex !== targetSlotIndex) return; // Restricción de columna
 
     // Verificar voluntad suficiente para ejercer el ataque (solo si es su primer ataque)
@@ -304,20 +313,67 @@ export const useGameState = () => {
     // Actualizar tablero defensor con efectos de estado
     const setDefenderBoard = isPlayer ? setOpponentBoard : setBoard;
     const newDefenderBoard = [...defenderBoard];
-    if (remainingHealth <= 0) {
-      newDefenderBoard[targetSlotIndex] = { card: null, stack: [] };
+
+    if (isAreaAttack) {
+      // El as de oros y as de copas atacan a TODAS las cartas del rival en mesa
+      for (let i = 0; i < 3; i++) {
+        if (newDefenderBoard[i].card) {
+          const tCard = newDefenderBoard[i].card!;
+          let eDamage = damageNum;
+          if (tCard.shield) eDamage = Math.max(0, eDamage - 1);
+          if ((tCard.bleedTurns ?? 0) > 0) eDamage += 1;
+          const rHealth = tCard.health - eDamage;
+
+          if (rHealth <= 0) {
+            newDefenderBoard[i] = { card: null, stack: [] };
+          } else {
+            let uTarget: CardData = { ...tCard, health: rHealth };
+            if (tCard.shield) uTarget = { ...uTarget, shield: false };
+            if ((tCard.bleedTurns ?? 0) > 0) uTarget = { ...uTarget, bleedTurns: 0 };
+            if (attackerCard.effect === 'poison' || isAsDeCopas) uTarget = { ...uTarget, poisonTurns: 3 };
+            newDefenderBoard[i] = { ...newDefenderBoard[i], card: uTarget };
+          }
+        }
+      }
     } else {
-      let updatedTarget: CardData = { ...targetCard, health: remainingHealth };
-      if (targetCard.shield) updatedTarget = { ...updatedTarget, shield: false };
-      if ((targetCard.bleedTurns ?? 0) > 0) updatedTarget = { ...updatedTarget, bleedTurns: 0 };
-      if (attackerCard.effect === 'poison') updatedTarget = { ...updatedTarget, poisonTurns: 3 };
-      if (attackerCard.effect === 'bleed')  updatedTarget = { ...updatedTarget, bleedTurns: 2 };
-      newDefenderBoard[targetSlotIndex] = { ...targetSlot, card: updatedTarget };
+      if (remainingHealth <= 0) {
+        newDefenderBoard[targetSlotIndex] = { card: null, stack: [] };
+      } else {
+        let updatedTarget: CardData = { ...targetCard, health: remainingHealth };
+        if (targetCard.shield) updatedTarget = { ...updatedTarget, shield: false };
+        if ((targetCard.bleedTurns ?? 0) > 0) updatedTarget = { ...updatedTarget, bleedTurns: 0 };
+        if (attackerCard.effect === 'poison') updatedTarget = { ...updatedTarget, poisonTurns: 3 };
+        if (attackerCard.effect === 'bleed')  updatedTarget = { ...updatedTarget, bleedTurns: 2 };
+        newDefenderBoard[targetSlotIndex] = { ...targetSlot, card: updatedTarget };
+      }
+
+      // As de Espadas: Daño en cruz (a las cartas de los lados)
+      if (isAsDeEspadas) {
+        const sideIndices = [targetSlotIndex - 1, targetSlotIndex + 1];
+        for (const idx of sideIndices) {
+          if (idx >= 0 && idx < 3 && newDefenderBoard[idx].card) {
+            const sideCard = newDefenderBoard[idx].card!;
+            let eDamage = damageNum;
+            if (sideCard.shield) eDamage = Math.max(0, eDamage - 1);
+            if ((sideCard.bleedTurns ?? 0) > 0) eDamage += 1;
+            const rHealth = sideCard.health - eDamage;
+
+            if (rHealth <= 0) {
+              newDefenderBoard[idx] = { card: null, stack: [] };
+            } else {
+              let uTarget: CardData = { ...sideCard, health: rHealth };
+              if (sideCard.shield) uTarget = { ...uTarget, shield: false };
+              if ((sideCard.bleedTurns ?? 0) > 0) uTarget = { ...uTarget, bleedTurns: 0 };
+              newDefenderBoard[idx] = { ...newDefenderBoard[idx], card: uTarget };
+            }
+          }
+        }
+      }
     }
     setDefenderBoard(newDefenderBoard);
 
     // Efecto perforante -> Daño al jugador rival (daño total - 1)
-    const isPierce = attackerCard.effect === 'pierce' || attackerCard.attackType === 'PERFORAR';
+    const isPierce = attackerCard.effect === 'pierce' || attackerCard.attackType === 'PERFORAR' || isAsDeEspadas;
     if (isPierce) {
       const setDefenderHp = isPlayer ? setOpponentHp : setHp;
       setDefenderHp(prev => Math.max(0, prev - Math.max(0, damageNum - 1)));
@@ -340,8 +396,8 @@ export const useGameState = () => {
       setAttackerVoluntad(v => Math.min(10, v + 2));
     }
 
-    // steal_shield: la carta atacante gana escudo al asestar un golpe
-    if (attackerCard.effect === 'steal_shield') {
+    // steal_shield (o As de Bastos): la carta atacante gana escudo al asestar un golpe
+    if (attackerCard.effect === 'steal_shield' || isAsDeBastos) {
       const setAttackerBoardFn = isPlayer ? setBoard : setOpponentBoard;
       setAttackerBoardFn(prev => {
         const updated = [...prev];
@@ -351,12 +407,20 @@ export const useGameState = () => {
       });
     }
 
-    // steal_will: rival -1 voluntad, atacante +1 voluntad
-    if (attackerCard.effect === 'steal_will') {
+    // steal_will (o Pícaro de Oros): rival -1 voluntad, atacante +1 voluntad
+    if (attackerCard.effect === 'steal_will' || (attackerCard.rank === 8 && attackerCard.suit === 'oros')) {
       const setAttVol = isPlayer ? setVoluntad : setOpponentVoluntad;
       const setDefVol = isPlayer ? setOpponentVoluntad : setVoluntad;
       setAttVol(v => Math.min(10, v + 1));
       setDefVol(v => Math.max(0, v - 1));
+    }
+
+    // As de Oros: roba 2 de voluntad al rival
+    if (isAsDeOros) {
+      const setAttVol = isPlayer ? setVoluntad : setOpponentVoluntad;
+      const setDefVol = isPlayer ? setOpponentVoluntad : setVoluntad;
+      setAttVol(v => Math.min(10, v + 2));
+      setDefVol(v => Math.max(0, v - 2));
     }
 
     // Registrar la acción de ataque
@@ -450,8 +514,8 @@ export const useGameState = () => {
       }
     }
 
-    // steal_shield: gana escudo al golpear al jugador rival
-    if (attackerCard.effect === 'steal_shield') {
+    // steal_shield (o As de Bastos): gana escudo al golpear al jugador rival
+    if (attackerCard.effect === 'steal_shield' || (attackerCard.rank === 1 && attackerCard.suit === 'bastos')) {
       const setAttackerBoardFn = isPlayer ? setBoard : setOpponentBoard;
       setAttackerBoardFn(prev => {
         const updated = [...prev];
@@ -461,12 +525,20 @@ export const useGameState = () => {
       });
     }
 
-    // steal_will: rival -1 voluntad, atacante +1 voluntad al golpear directo
-    if (attackerCard.effect === 'steal_will') {
+    // steal_will (o Pícaro de Oros): rival -1 voluntad, atacante +1 voluntad al golpear directo
+    if (attackerCard.effect === 'steal_will' || (attackerCard.rank === 8 && attackerCard.suit === 'oros')) {
       const setAttVol = isPlayer ? setVoluntad : setOpponentVoluntad;
       const setDefVol = isPlayer ? setOpponentVoluntad : setVoluntad;
       setAttVol(v => Math.min(10, v + 1));
       setDefVol(v => Math.max(0, v - 1));
+    }
+
+    // As de Oros al atacar directo: roba 2 de voluntad
+    if (attackerCard.rank === 1 && attackerCard.suit === 'oros') {
+      const setAttVol = isPlayer ? setVoluntad : setOpponentVoluntad;
+      const setDefVol = isPlayer ? setOpponentVoluntad : setVoluntad;
+      setAttVol(v => Math.min(10, v + 2));
+      setDefVol(v => Math.max(0, v - 2));
     }
 
     // Registrar la acción de ataque
