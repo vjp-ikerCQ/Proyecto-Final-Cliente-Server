@@ -7,6 +7,7 @@ import { useGameState, type BoardSlot } from './hooks/useGameState';
 import { useBotAI } from './hooks/useBotAI';
 import AtmosphereParticles from '../../components/AtmosphereParticles';
 import { updateMatchStats } from '../../services/userService';
+import { GameOverOverlay } from './components/GameOverOverlay';
 
 const MAX_HP = 30;
 
@@ -584,61 +585,15 @@ const Game: React.FC<GameProps> = ({ user }) => {
       {/* MODAL FIN DE PARTIDA: VICTORIA / DERROTA */}
       <AnimatePresence>
         {gameOver && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
-          >
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0, y: 30 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              transition={{ delay: 0.1, type: 'spring', stiffness: 200, damping: 20 }}
-              className={`relative w-full max-w-md text-center p-8 md:p-12 rounded-2xl border shadow-2xl overflow-hidden ${
-                gameOver === 'victory'
-                  ? 'bg-[#080e08] border-primary-gold/40 shadow-[0_0_60px_rgba(166,138,100,0.2)]'
-                  : 'bg-[#0e0808] border-red-900/40 shadow-[0_0_60px_rgba(220,38,38,0.15)]'
-              }`}
-            >
-              {/* Destellos de fondo */}
-              <div className={`absolute inset-0 opacity-5 pointer-events-none ${gameOver === 'victory' ? 'bg-primary-gold' : 'bg-red-600'}`} />
-
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.3, type: 'spring', stiffness: 300 }}
-                className={`text-6xl md:text-8xl font-black font-cinzel tracking-tighter mb-4 ${
-                  gameOver === 'victory' ? 'text-gold-gradient' : 'text-red-500'
-                }`}
-              >
-                {gameOver === 'victory' ? 'VICTORIA' : 'DERROTA'}
-              </motion.div>
-
-              <p className="text-gray-400 text-sm mb-10 font-spectral">
-                {gameOver === 'victory'
-                  ? 'Has derrotado a tu rival. El reino te pertenece.'
-                  : 'Tu ejército ha caído. El reino se ha perdido.'}
-              </p>
-
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={() => { navigate('/game'); window.location.reload(); }}
-                  className={`flex-1 py-3 px-6 font-black uppercase tracking-widest text-xs rounded border transition-all ${
-                    gameOver === 'victory'
-                      ? 'bg-primary-gold/10 text-primary-gold border-primary-gold/40 hover:bg-primary-gold/20'
-                      : 'bg-red-950/30 text-red-400 border-red-800/40 hover:bg-red-950/50'
-                  }`}
-                >
-                  Volver a jugar
-                </button>
-                <button
-                  onClick={() => navigate('/menu')}
-                  className="flex-1 py-3 px-6 bg-white/5 text-gray-300 font-black uppercase tracking-widest text-xs rounded border border-white/10 hover:bg-white/10 transition-all"
-                >
-                  Menú principal
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+          <GameOverOverlay
+            result={gameOver}
+            userName={user.name || 'Héroe'}
+            onRestart={() => {
+              navigate('/game');
+              window.location.reload();
+            }}
+            onMainMenu={() => navigate('/menu')}
+          />
         )}
       </AnimatePresence>
 
@@ -679,7 +634,8 @@ const Game: React.FC<GameProps> = ({ user }) => {
                       statsUpdated.current = true;
                       updateMatchStats(user.name, 'lose');
                     }
-                    navigate('/menu');
+                    setShowSurrenderModal(false);
+                    setGameOver('defeat');
                   }}
                   className="flex-1 py-3 px-6 bg-red-600 text-white rounded-lg uppercase tracking-widest text-xs font-black hover:bg-red-500 shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all"
                 >
@@ -853,6 +809,17 @@ const BoardSlotView: React.FC<{
               </div>
             </div>
           </div>
+
+          {/* Indicador de costo de voluntad en el tablero */}
+          <div className="absolute -top-1 -right-1 md:-top-2 md:-right-2 z-[60]">
+            <div
+              className="w-4 h-4 md:w-7 md:h-7 rounded-full bg-black/95 backdrop-blur-md flex items-center justify-center border md:border-2 shadow-2xl"
+              style={{ borderColor: suitColors[slot.card.suit] }}
+            >
+              <span className="text-[7px] md:text-xs font-bold" style={{ color: suitColors[slot.card.suit] }}>{slot.card.cost}</span>
+            </div>
+          </div>
+
           {slot.stack.length > 1 && (
             <div className="absolute -bottom-1 -right-1 w-4 h-4 md:w-6 md:h-6 rounded bg-primary-gold text-black flex items-center justify-center font-black text-[8px] md:text-xs border border-black z-[60]">
               +{slot.stack.length - 1}
