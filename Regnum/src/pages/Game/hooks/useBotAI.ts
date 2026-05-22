@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { type CardData } from '../../../utils/cardData';
 import { type BoardSlot } from './useGameState';
 
@@ -14,6 +14,16 @@ interface BotAIOptions {
   setOpponentVoluntad: React.Dispatch<React.SetStateAction<number>>;
   setOpponentBoard: React.Dispatch<React.SetStateAction<BoardSlot[]>>;
   endTurn: (isPlayer: boolean) => void;
+  board: BoardSlot[];
+  hp: number;
+  attackCard: (isPlayer: boolean, attackerSlotIndex: number, targetSlotIndex: number) => void;
+  attackDirectly: (isPlayer: boolean, attackerSlotIndex: number) => void;
+  healCard: (isPlayer: boolean, healerSlotIndex: number, targetSlotIndex: number) => void;
+  useJoker: (isPlayer: boolean, handCardIndex: number) => void;
+  playCard: (isPlayer: boolean, slotIndex: number, handCardIndex: number) => void;
+  drawCard: (isPlayer: boolean) => void;
+  opponentAttackedIndices: number[];
+  opponentMagoAttacks: Record<number, number[]>;
 }
 
 export const useBotAI = ({
@@ -27,68 +37,170 @@ export const useBotAI = ({
   setDeck,
   setOpponentVoluntad,
   setOpponentBoard,
-  endTurn
+  endTurn,
+  board,
+  hp,
+  attackCard,
+  attackDirectly,
+  healCard,
+  useJoker,
+  playCard,
+  drawCard,
+  opponentAttackedIndices,
+  opponentMagoAttacks
 }: BotAIOptions) => {
 
+  const isExecutingRef = useRef(false);
+
   useEffect(() => {
-    if (isPlayerTurn || isLoading) return;
+    if (isPlayerTurn || isLoading) {
+      isExecutingRef.current = false;
+      return;
+    }
 
-    const playBotTurn = async () => {
-      // 1. Pausa inicial para que se note que es el turno del bot
-      await new Promise(r => setTimeout(r, 1000));
+    if (isExecutingRef.current) return;
 
-      let currentVoluntad = opponentVoluntad;
-      let currentDeck = [...deck];
-      let currentOpponentHand = [...opponentHand];
-      let currentOpponentBoard = [...opponentBoard];
+    isExecutingRef.current = true;
 
-      // 2. El bot roba cartas siempre que pueda
-      while (currentVoluntad >= 1 && currentOpponentHand.length < 5 && currentDeck.length > 0) {
-        await new Promise(r => setTimeout(r, 800)); // Pausa entre cada carta que roba
-        
-        const nextCard = currentDeck[0];
-        currentOpponentHand.push(nextCard);
-        currentDeck = currentDeck.slice(1);
-        currentVoluntad -= 1;
+    const timer = setTimeout(() => {
+      let actionTaken = false;
 
-        // Actualizamos estado visualmente paso a paso
-        setOpponentHand([...currentOpponentHand]);
-        setDeck([...currentDeck]);
-        setOpponentVoluntad(currentVoluntad);
+      // 1. Usar Jokers
+      const jokerIndex = opponentHand.findIndex(c => c.suit === 'jokers');
+      if (jokerIndex !== -1 && opponentVoluntad >= 1) {
+        useJoker(false, jokerIndex);
+        actionTaken = true;
       }
 
-      // 3. El bot baja cartas a la mesa en los huecos vacíos
-      for (let i = 0; i < 3; i++) {
-        // Si el hueco está libre, intenta jugar una carta no-joker de su mano que pueda pagar
-        if (!currentOpponentBoard[i].card) {
-          const playableCardIndex = currentOpponentHand.findIndex(
-            card => card.suit !== 'jokers'
-          );
-
-          if (playableCardIndex !== -1) {
-            await new Promise(r => setTimeout(r, 800)); // Retraso visual para ver la colocación
-
-            const cardToPlay = currentOpponentHand[playableCardIndex];
-
-            // Jugar la carta (despliegue gratuito)
-            currentOpponentBoard[i] = { card: cardToPlay, stack: [cardToPlay] };
-            currentOpponentHand = currentOpponentHand.filter((_, idx) => idx !== playableCardIndex);
-
-            // Actualizar estados
-            setOpponentBoard([...currentOpponentBoard]);
-            setOpponentHand([...currentOpponentHand]);
+      // 2. Bajar Cartas
+      if (!actionTaken) {
+        for (let i = 0; i < 3; i++) {
+          if (!opponentBoard[i].card) {
+            const playableIndex = opponentHand.findIndex(c => c.suit !== 'jokers');
+            if (playableIndex !== -1) {
+              playCard(false, i, playableIndex);
+              actionTaken = true;
+              break;
+            }
           }
         }
       }
 
-      // 4. Pequeña pausa antes de terminar turno
-      await new Promise(r => setTimeout(r, 1000));
+      // 3. Atacar o Curar
+      if (!actionTaken) {
+        for (let i = 0; i < 3; i++) {
+          const slot = opponentBoard[i];
+          if (!slot.card) continue;
+          
+          const card = slot.card;
+          const isMago = card.role.toUpperCase() === 'MAGO';
+          const magoAttacks = opponentMagoAttacks[i] || [];
+          const hasAttackedOnce = isMago && magoAttacks.length > 0;
+          
+          if (opponentAttackedIndices.includes(i)) continue;
+          if (!hasAttackedOnce && opponentVoluntad < card.cost) continue;
 
-      // 5. Terminar turno del bot
-      endTurn(false);
+          if (card.role === 'CURANDERO') {
+            let targetToHeal = -1;
+            for (let j = 0; j < 3; j++) {
+              if (i !== j && opponentBoard[j].card) {
+                const ally = opponentBoard[j].card!;
+                // Cura si tiene menos de 5 de vida o si es la única carta
+                if (ally.health <= 5) {
+                  targetToHeal = j;
+                  break;
+                }
+              }
+            }
+            if (targetToHeal !== -1) {
+              healCard(false, i, targetToHeal);
+              actionTaken = true;
+              break;
+            } else {
+              continue; // Curandero no ataca
+            }
+          }
+
+          if (card.attackType !== 'SOPORTE') {
+            let canAttackDir = false;
+            let validTargets: number[] = [];
+            const TARGETING_ROLES = ['ASESINO', 'TANQUE', 'TIRADOR', 'PICARO', 'SOTA'];
+            const isTargeting = TARGETING_ROLES.includes(card.role.toUpperCase()) || isMago;
+            const hasPlayerCards = board.some(s => s.card);
+
+            if (isMago) {
+              const alreadyAttackedCara = magoAttacks.includes(-1);
+              if (!alreadyAttackedCara && board.filter(s => s.card).length < 2) {
+                 canAttackDir = true;
+              }
+              for (let j = 0; j < 3; j++) {
+                if (board[j].card && !magoAttacks.includes(j)) {
+                  validTargets.push(j);
+                }
+              }
+            } else if (isTargeting) {
+              if (!hasPlayerCards) canAttackDir = true;
+              else {
+                 for (let j = 0; j < 3; j++) {
+                   if (board[j].card) validTargets.push(j);
+                 }
+              }
+            } else if (card.attackType === 'COLUMNA') {
+              if (!board[i].card) canAttackDir = true;
+              else validTargets.push(i);
+            } else if (card.attackType === 'DIRECTO') {
+              canAttackDir = true;
+            } else {
+              if (!hasPlayerCards) canAttackDir = true;
+              else if (board[i].card) validTargets.push(i);
+            }
+
+            if (validTargets.length > 0) {
+              attackCard(false, i, validTargets[0]);
+              actionTaken = true;
+              break;
+            } else if (canAttackDir) {
+              attackDirectly(false, i);
+              actionTaken = true;
+              break;
+            }
+          }
+        }
+      }
+
+      // 4. Robar cartas
+      if (!actionTaken && opponentVoluntad >= 1 && opponentHand.length < 5 && deck.length > 0) {
+        drawCard(false);
+        actionTaken = true;
+      }
+
+      if (!actionTaken) {
+        endTurn(false);
+      }
+
+    }, 800); // 800ms de pausa entre acciones del bot
+
+    return () => {
+      clearTimeout(timer);
+      isExecutingRef.current = false;
     };
-
-    playBotTurn();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlayerTurn, isLoading]); // Solo dependemos de estos para que no se re-ejecute en bucle
+  }, [
+    isPlayerTurn,
+    isLoading,
+    opponentHand,
+    opponentVoluntad,
+    opponentBoard,
+    deck,
+    board,
+    hp,
+    opponentAttackedIndices,
+    opponentMagoAttacks,
+    useJoker,
+    playCard,
+    drawCard,
+    healCard,
+    attackCard,
+    attackDirectly,
+    endTurn
+  ]);
 };

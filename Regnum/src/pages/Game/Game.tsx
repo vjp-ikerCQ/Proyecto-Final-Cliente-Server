@@ -70,7 +70,17 @@ const Game: React.FC<GameProps> = ({ user }) => {
     setDeck,
     setOpponentVoluntad,
     setOpponentBoard,
-    endTurn
+    endTurn,
+    board,
+    hp,
+    attackCard: gameState.attackCard,
+    attackDirectly: gameState.attackDirectly,
+    healCard: gameState.healCard,
+    useJoker: gameState.useJoker,
+    playCard: gameState.playCard,
+    drawCard: gameState.drawCard,
+    opponentAttackedIndices: gameState.opponentAttackedIndices,
+    opponentMagoAttacks: gameState.opponentMagoAttacks
   });
 
   // Gestión de selección local de la UI
