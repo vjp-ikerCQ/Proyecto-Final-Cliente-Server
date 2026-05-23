@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 import { Crown, Skull, RotateCcw, Home, Trophy, Swords, Flame, Sparkles } from 'lucide-react';
 
 interface GameOverOverlayProps {
@@ -325,8 +325,7 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
 
   const isVic = result === 'victory';
 
-  // Animaciones del panel con Framer Motion (Stagger)
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
@@ -337,7 +336,7 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
     },
   };
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { y: 35, opacity: 0 },
     visible: {
       y: 0,
@@ -346,7 +345,7 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
     },
   };
 
-  const badgeVariants = {
+  const badgeVariants: Variants = {
     hidden: { scale: 0.2, rotate: -45, opacity: 0 },
     visible: {
       scale: 1,
@@ -356,7 +355,7 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
     },
   };
 
-  const crownSparkleVariants = {
+  const crownSparkleVariants: Variants = {
     animate: {
       scale: [1, 1.1, 1],
       rotate: [0, 5, -5, 0],
@@ -373,7 +372,7 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
     },
   };
 
-  const skullBurnVariants = {
+  const skullBurnVariants: Variants = {
     animate: {
       y: [0, -3, 0],
       filter: [
