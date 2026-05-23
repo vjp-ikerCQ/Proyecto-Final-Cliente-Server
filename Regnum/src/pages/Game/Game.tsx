@@ -6,8 +6,6 @@ import { type CardData } from '../../utils/cardData';
 import { useGameState, type BoardSlot } from './hooks/useGameState';
 import { useBotAI } from './hooks/useBotAI';
 import AtmosphereParticles from '../../components/AtmosphereParticles';
-import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
-import SurrenderTransition from '../../components/UI/SurrenderTransition';
 import { updateMatchStats } from '../../services/userService';
 import { GameOverOverlay } from './components/GameOverOverlay';
 
@@ -144,13 +142,11 @@ const Game: React.FC<GameProps> = ({ user }) => {
 
   // Manejadores específicos de la UI del jugador
   const handleDrawCard = () => {
-    playSfx();
     drawCard(true);
   };
 
   const handlePlayCard = (slotIndex: number) => {
     if (selectedHandCardIndex === null) return;
-    playSfx();
     playCard(true, slotIndex, selectedHandCardIndex);
     setSelectedHandCardIndex(null);
   };
@@ -189,9 +185,9 @@ const Game: React.FC<GameProps> = ({ user }) => {
       if (isOpponentSlotActiveToAttack(slotIndex)) {
         const isMago = attackerCard?.role.toUpperCase() === 'MAGO';
         const magoAttacksCount = (playerMagoAttacks[selectedAttackerIndex] || []).length;
-        
+
         gameState.attackCard(true, selectedAttackerIndex, slotIndex);
-        
+
         // Deseleccionar al atacante si no es un Mago, o si ya ha realizado su segundo ataque
         if (!isMago || magoAttacksCount >= 1) {
           setSelectedAttackerIndex(null);
@@ -242,7 +238,6 @@ const Game: React.FC<GameProps> = ({ user }) => {
 
   const handleUseJoker = () => {
     if (selectedHandCardIndex === null) return;
-    playSfx();
     useJoker(true, selectedHandCardIndex);
     setSelectedHandCardIndex(null);
   };
@@ -263,7 +258,6 @@ const Game: React.FC<GameProps> = ({ user }) => {
   };
 
   const handleEndTurn = () => {
-    playSfx();
     endTurn(true);
     setSelectedHandCardIndex(null);
     setSelectedAttackerIndex(null);
@@ -280,9 +274,9 @@ const Game: React.FC<GameProps> = ({ user }) => {
 
     const isMago = attackerCard.role.toUpperCase() === 'MAGO';
     const hasAlreadyAttackedOnce = isMago && (playerMagoAttacks[selectedAttackerIndex] || []).length > 0;
-    
+
     // Solo verificar costo si no es el segundo ataque de un mago
-    if (!hasAlreadyAttackedOnce && voluntad < attackerCard.cost) return false; 
+    if (!hasAlreadyAttackedOnce && voluntad < attackerCard.cost) return false;
 
     // Si el atacante es un mago, verificar que no haya atacado a este mismo objetivo en este turno
     if (isMago) {
@@ -343,7 +337,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
   };
 
   return (
-    <motion.div 
+    <motion.div
       animate={isShaking ? { x: [-2, 2, -2, 2, 0], y: [-1, 1, -1, 1, 0] } : {}}
       transition={{ duration: 0.4 }}
       className="h-screen w-full bg-bg-main text-text-main overflow-hidden font-spectral flex flex-col relative"
@@ -355,24 +349,24 @@ const Game: React.FC<GameProps> = ({ user }) => {
 
       {/* HEADER */}
       <header className="relative z-20 p-1 md:p-2 lg:p-3 flex flex-col sm:flex-row justify-between items-center gap-1 md:gap-3 border-b border-white/5 bg-black/40 backdrop-blur-md shrink-0">
-      
-      {/* Pantalla de Carga del Duelo */}
-      <AnimatePresence>
-        {isLoading && (
-          <motion.div 
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center gap-6"
-          >
-            <motion.div 
-              animate={{ rotate: 360 }}
-              transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-              className="w-20 h-20 border-t-2 border-primary-gold rounded-full"
-            />
-            <h2 className="text-primary-gold font-cinzel tracking-[0.3em] uppercase text-xl animate-pulse">Preparando Mazo...</h2>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
+        {/* Pantalla de Carga del Duelo */}
+        <AnimatePresence>
+          {isLoading && (
+            <motion.div
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center gap-6"
+            >
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                className="w-20 h-20 border-t-2 border-primary-gold rounded-full"
+              />
+              <h2 className="text-primary-gold font-cinzel tracking-[0.3em] uppercase text-xl animate-pulse">Preparando Mazo...</h2>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <div className="flex justify-between w-full sm:w-auto items-center px-2">
           <button
             onClick={() => {
@@ -436,7 +430,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
               key={`opp-${i}`}
               slot={slot}
               isOpponent
-              onSelect={handleSelectCard}
+              onSelect={setViewingCard}
               isActiveToAttack={isOpponentSlotActiveToAttack(i) && slot.card !== null}
               onClick={() => handleOpponentSlotClick(i)}
             />
@@ -455,7 +449,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
             <BoardSlotView
               key={`player-${i}`}
               slot={slot}
-              onSelect={handleSelectCard}
+              onSelect={setViewingCard}
               isAttacking={selectedAttackerIndex === i}
               hasAttacked={gameState.playerAttackedIndices.includes(i)}
               isActiveToPlay={selectedHandCardIndex !== null && !slot.card && !selectedIsJoker && canAffordSelected}
@@ -486,11 +480,10 @@ const Game: React.FC<GameProps> = ({ user }) => {
               onDrop={handleDiscardDrop}
               className={`flex flex-col items-center gap-1 transition-opacity ${playerHasDiscarded ? 'opacity-40' : ''}`}
             >
-              <div className={`w-10 sm:w-14 md:w-16 aspect-[2/3] border rounded-md relative overflow-hidden shrink-0 transition-all ${
-                isDragOverDiscard && !playerHasDiscarded
+              <div className={`w-10 sm:w-14 md:w-16 aspect-[2/3] border rounded-md relative overflow-hidden shrink-0 transition-all ${isDragOverDiscard && !playerHasDiscarded
                   ? 'border-red-400 bg-red-950/30 shadow-[0_0_12px_rgba(239,68,68,0.3)]'
                   : 'border-white/10 bg-[#080808]'
-              }`}>
+                }`}>
                 {discardPile.length > 0 ? (
                   <>
                     <img src={discardPile[discardPile.length - 1].image} className="w-full h-full object-cover opacity-50" />
@@ -513,13 +506,9 @@ const Game: React.FC<GameProps> = ({ user }) => {
                   key={`${card.id}-${i}`}
                   card={card}
                   isSelected={selectedHandCardIndex === i}
-                  onClick={() => {
-                    playSfx();
-                    setSelectedHandCardIndex(selectedHandCardIndex === i ? null : i);
-                  }}
+                  onClick={() => setSelectedHandCardIndex(selectedHandCardIndex === i ? null : i)}
                   onRightClick={(e) => {
                     e.preventDefault();
-                    playSfx();
                     setViewingCard(card);
                   }}
                   draggable={!playerHasDiscarded}
@@ -558,13 +547,12 @@ const Game: React.FC<GameProps> = ({ user }) => {
           <motion.button
             onClick={handleDiscard}
             disabled={selectedHandCardIndex === null || playerHasDiscarded}
-            className={`flex-1 md:w-full py-2.5 md:py-3 px-4 font-black uppercase tracking-widest rounded border text-[9px] md:text-xs text-center transition-all ${
-              playerHasDiscarded
+            className={`flex-1 md:w-full py-2.5 md:py-3 px-4 font-black uppercase tracking-widest rounded border text-[9px] md:text-xs text-center transition-all ${playerHasDiscarded
                 ? 'bg-transparent text-gray-700 border-white/5 cursor-not-allowed'
                 : selectedHandCardIndex !== null
                   ? 'bg-red-950/60 text-red-300 border-red-800/60 hover:bg-red-900/60 cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.15)]'
                   : 'bg-transparent text-gray-600 border-white/10 cursor-not-allowed'
-            }`}
+              }`}
           >
             {playerHasDiscarded ? '✓ Descartada' : 'Descartar'}
           </motion.button>
@@ -577,10 +565,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-modal-backdrop backdrop-blur-sm overflow-y-auto"
-            onClick={() => {
-              playSfx();
-              setViewingCard(null);
-            }}
+            onClick={() => setViewingCard(null)}
           >
             <div className="max-w-4xl w-full flex flex-col md:flex-row gap-6 md:gap-12 items-center" onClick={e => e.stopPropagation()}>
               <motion.div
@@ -598,13 +583,46 @@ const Game: React.FC<GameProps> = ({ user }) => {
                   </div>
                 </div>
                 <div className="p-4 bg-surface border border-accent-gray/20 rounded-xl italic text-secondary-theme">"{viewingCard.effect}"</div>
-                <button onClick={() => {
-                  playSfx();
-                  setViewingCard(null);
-                }} className="md:hidden w-full py-3 bg-white/10 uppercase tracking-widest text-[10px] font-bold">Cerrar</button>
+                <button onClick={() => setViewingCard(null)} className="md:hidden w-full py-3 bg-white/10 uppercase tracking-widest text-[10px] font-bold">Cerrar</button>
               </div>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* AVISOS DE JUEGO */}
+      <AnimatePresence>
+        {warningText && (
+          <motion.div
+            key={warningText}
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="fixed bottom-32 left-1/2 -translate-x-1/2 z-150 pointer-events-none"
+          >
+            <div className="flex items-center gap-2 bg-black/90 border border-primary-gold/40 rounded-lg px-4 py-2.5 shadow-[0_0_20px_rgba(166,138,100,0.2)] backdrop-blur-md">
+              <span className="text-primary-gold text-lg font-black">⚡</span>
+              <span className="text-primary-gold font-bold uppercase tracking-widest text-[10px] md:text-xs whitespace-nowrap">
+                {warningText}
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL FIN DE PARTIDA: VICTORIA / DERROTA */}
+      <AnimatePresence>
+        {gameOver && (
+          <GameOverOverlay
+            result={gameOver}
+            userName={user.name || 'Héroe'}
+            onRestart={() => {
+              navigate('/game');
+              window.location.reload();
+            }}
+            onMainMenu={() => navigate('/menu')}
+          />
         )}
       </AnimatePresence>
 
@@ -664,7 +682,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
               </div>
               <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter mb-4">¿Abandonar el combate?</h3>
               <p className="text-gray-400 mb-8 leading-relaxed">
-                Si te rindes ahora, la batalla se considerará una <span className="text-red-500 font-bold uppercase">derrota</span> deshonrosa. 
+                Si te rindes ahora, la batalla se considerará una <span className="text-red-500 font-bold uppercase">derrota</span> deshonrosa.
                 <br /><br />
                 ¿Estás seguro de que deseas retirarte a las sombras?
               </p>
@@ -680,13 +698,12 @@ const Game: React.FC<GameProps> = ({ user }) => {
                 </button>
                 <button
                   onClick={() => {
-                    playSfx();
                     if (!statsUpdated.current && !user.isGuest) {
                       statsUpdated.current = true;
                       updateMatchStats(user.name, 'lose');
                     }
                     setShowSurrenderModal(false);
-                    setIsSurrendering(true);
+                    setGameOver('defeat');
                   }}
                   className="flex-1 py-3 px-6 bg-red-600 text-white rounded-lg uppercase tracking-widest text-xs font-black hover:bg-red-500 shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all"
                 >
@@ -695,12 +712,6 @@ const Game: React.FC<GameProps> = ({ user }) => {
               </div>
             </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {isSurrendering && (
-          <SurrenderTransition onComplete={() => navigate('/menu')} />
         )}
       </AnimatePresence>
     </motion.div>
