@@ -9,7 +9,8 @@ import {
   LogOut,
   Pen,
   Coins,
-  Wine
+  Wine,
+  Shield
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -64,14 +65,25 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
     playMusic(MUSIC_KEYS.MENU);
   }, []);
 
-  // Definición de las opciones del menú principal
-  const menuItems = [
-    { id: 'new-game', text: t('menu.newGame'), icon: <Sword size={20} />, primary: true },
+  const menuItems = [];
+
+  // El admin no puede jugar, solo gestionar
+  if (user.name !== 'admin') {
+    menuItems.push({ id: 'new-game', text: t('menu.newGame'), icon: <Sword size={20} />, primary: true });
+  }
+
+  menuItems.push(
     { id: 'rankings', text: t('menu.rankings'), icon: <Trophy size={20} />, primary: false },
     { id: 'gallery', text: t('menu.gallery'), icon: <BookOpen size={20} />, primary: false },
     { id: 'settings', text: t('menu.settings'), icon: <Settings size={20} />, primary: false },
-    { id: 'exit', text: t('menu.exit'), icon: <LogOut size={20} />, primary: false },
-  ];
+  );
+
+  if (user.name === 'admin') {
+    // Para el admin, el botón de gestionar es el principal
+    menuItems.push({ id: 'admin', text: 'Admin', icon: <Shield size={20} />, primary: true });
+  }
+
+  menuItems.push({ id: 'exit', text: t('menu.exit'), icon: <LogOut size={20} />, primary: false });
 
   /**
    * Maneja las acciones de cada botón del menú
@@ -91,6 +103,9 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
         break;
       case 'rankings':
         setIsRankingsOpen(true);
+        break;
+      case 'admin':
+        navigate('/admin');
         break;
       case 'exit':
         setIsLogoutTransitioning(true);

@@ -58,6 +58,21 @@ export const getRankings = async (): Promise<RankingEntry[]> => {
   }
 };
 /**
+ * Actualiza las estadísticas al final de una partida
+ */
+export const updateMatchStats = async (username: string, result: 'win' | 'lose'): Promise<void> => {
+  try {
+    await fetch('http://localhost:5000/api/stats/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, result }),
+    });
+  } catch (error) {
+    console.error('Error al actualizar estadísticas:', error);
+  }
+};
+
+/**
  * Elimina la cuenta del usuario actual
  */
 export const deleteAccount = async (username: string, password: string): Promise<{ success: boolean; message: string }> => {

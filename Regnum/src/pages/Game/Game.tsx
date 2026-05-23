@@ -1,17 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Shield,
-  Swords,
-  Layers,
-  ArrowLeft
-} from 'lucide-react';
+import { Shield, Swords, Layers, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { allCards, type CardData } from '../../utils/cardData';
-import { fetchAllCards } from '../../services/cardService';
+import { type CardData } from '../../utils/cardData';
+import { useGameState, type BoardSlot } from './hooks/useGameState';
+import { useBotAI } from './hooks/useBotAI';
 import AtmosphereParticles from '../../components/AtmosphereParticles';
 import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
 import SurrenderTransition from '../../components/UI/SurrenderTransition';
+import { updateMatchStats } from '../../services/userService';
+import { GameOverOverlay } from './components/GameOverOverlay';
+
+const MAX_HP = 30;
 
 /**
  * Colores representativos para cada palo
@@ -24,13 +24,11 @@ const suitColors = {
   jokers: '#a855f7',
 };
 
-// Tipos para el estado del juego
-interface BoardSlot {
-  card: CardData | null;
-  stack: CardData[]; // Para la mecánica de escalera
+interface GameProps {
+  user: { name: string; isGuest: boolean };
 }
 
-const Game: React.FC = () => {
+const Game: React.FC<GameProps> = ({ user }) => {
   const navigate = useNavigate();
   const { playSfx, playMusic, stopMusic } = useSettings();
 
@@ -50,32 +48,72 @@ const Game: React.FC = () => {
     };
   }, []);
 
-  // Estado del Jugador
-  const [voluntad, setVoluntad] = useState(10);
-  const [hp, setHp] = useState(100);
-  const [hand, setHand] = useState<CardData[]>([]);
-  const [deck, setDeck] = useState<CardData[]>([]);
-  const [board, setBoard] = useState<BoardSlot[]>([
-    { card: null, stack: [] },
-    { card: null, stack: [] },
-    { card: null, stack: [] }
-  ]);
+  // Custom Hooks para estado y bot
+  const gameState = useGameState();
+  const {
+    voluntad,
+    hp,
+    hand,
+    board,
+    opponentHp,
+    opponentVoluntad,
+    opponentHand,
+    opponentBoard,
+    deck,
+    isPlayerTurn,
+    isLoading,
+    drawCard,
+    playCard,
+    useJoker,
+    endTurn,
+    healCard,
+    setOpponentHand,
+    setDeck,
+    setOpponentVoluntad,
+    setOpponentBoard,
+    playerMagoAttacks,
+    hasMagoAttackedTarget,
+    playerHasDiscarded,
+    discardCard,
+    discardPile
+  } = gameState;
 
-  // Estado del Oponente (Simulado)
-  const [opponentHp] = useState(100);
-  const [opponentBoard] = useState<BoardSlot[]>([
-    { card: null, stack: [] },
-    { card: null, stack: [] },
-    { card: null, stack: [] }
-  ]);
+  useBotAI({
+    isPlayerTurn,
+    isLoading,
+    opponentVoluntad,
+    opponentHand,
+    opponentBoard,
+    deck,
+    setOpponentHand,
+    setDeck,
+    setOpponentVoluntad,
+    setOpponentBoard,
+    endTurn,
+    board,
+    hp,
+    attackCard: gameState.attackCard,
+    attackDirectly: gameState.attackDirectly,
+    healCard: gameState.healCard,
+    useJoker: gameState.useJoker,
+    playCard: gameState.playCard,
+    drawCard: gameState.drawCard,
+    opponentAttackedIndices: gameState.opponentAttackedIndices,
+    opponentMagoAttacks: gameState.opponentMagoAttacks
+  });
 
-  // Gestión de selección
+  // Gestión de selección local de la UI
   const [selectedHandCardIndex, setSelectedHandCardIndex] = useState<number | null>(null);
+  const [selectedAttackerIndex, setSelectedAttackerIndex] = useState<number | null>(null);
   const [viewingCard, setViewingCard] = useState<CardData | null>(null);
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
   const [isSurrendering, setIsSurrendering] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [warningText, setWarningText] = useState<string | null>(null);
+  const [draggingHandIndex, setDraggingHandIndex] = useState<number | null>(null);
+  const [isDragOverDiscard, setIsDragOverDiscard] = useState(false);
+  const [gameOver, setGameOver] = useState<'victory' | 'defeat' | null>(null);
+  const statsUpdated = useRef(false);
 
   useEffect(() => {
     if (voluntad < 5) {
@@ -85,94 +123,224 @@ const Game: React.FC = () => {
     }
   }, [voluntad]);
 
-  // Inicializar mazo desde el backend y barajar
   useEffect(() => {
-    const initializeGame = async () => {
-      setIsLoading(true);
-      try {
-        const allBackendCards = await fetchAllCards();
-        
-        // Barajar el mazo (Fisher-Yates Shuffle)
-        const shuffledDeck = [...allBackendCards];
-        for (let i = shuffledDeck.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [shuffledDeck[i], shuffledDeck[j]] = [shuffledDeck[j], shuffledDeck[i]];
-        }
+    if (!warningText) return;
+    const timer = setTimeout(() => setWarningText(null), 2000);
+    return () => clearTimeout(timer);
+  }, [warningText]);
 
-        // Robar las primeras 3 cartas
-        const initialHand = shuffledDeck.slice(0, 3);
-        const remainingDeck = shuffledDeck.slice(3);
+  useEffect(() => {
+    if (isLoading || statsUpdated.current) return;
+    if (hp <= 0) {
+      statsUpdated.current = true;
+      setGameOver('defeat');
+      if (!user.isGuest) updateMatchStats(user.name, 'lose');
+    } else if (opponentHp <= 0) {
+      statsUpdated.current = true;
+      setGameOver('victory');
+      if (!user.isGuest) updateMatchStats(user.name, 'win');
+    }
+  }, [hp, opponentHp, isLoading]);
 
-        setHand(initialHand);
-        setDeck(remainingDeck);
-      } catch (error) {
-        console.error("Error inicializando el juego:", error);
-        // Fallback a cartas locales si el backend falla
-        const fallbackHand = Array.from({ length: 3 }, () =>
-          allCards[Math.floor(Math.random() * allCards.length)]
-        );
-        setHand(fallbackHand);
-      } finally {
-        setIsLoading(false);
+  // Manejadores específicos de la UI del jugador
+  const handleDrawCard = () => {
+    playSfx();
+    drawCard(true);
+  };
+
+  const handlePlayCard = (slotIndex: number) => {
+    if (selectedHandCardIndex === null) return;
+    playSfx();
+    playCard(true, slotIndex, selectedHandCardIndex);
+    setSelectedHandCardIndex(null);
+  };
+
+  const handlePlayerSlotClick = (slotIndex: number) => {
+    const slot = board[slotIndex];
+    if (!slot.card) {
+      if (selectedHandCardIndex !== null) {
+        handlePlayCard(slotIndex);
       }
-    };
+    } else {
+      // Si hay un atacante/curandero seleccionado, y hacemos clic en otro de nuestros slots...
+      if (selectedAttackerIndex !== null && slot.card) {
+        if (attackerCard?.role === 'CURANDERO' && selectedAttackerIndex !== slotIndex) {
+          // Es un curandero y hacemos clic en una carta aliada -> ¡CURAR!
+          if (voluntad < attackerCard.cost) {
+            setWarningText('Voluntad insuficiente');
+            return;
+          }
+          healCard(true, selectedAttackerIndex, slotIndex);
+          setSelectedAttackerIndex(null);
+          return;
+        }
+      }
 
-    initializeGame();
-  }, []);
-
-  // Función para robar carta del mazo real
-  const drawCard = () => {
-    if (voluntad >= 1 && hand.length < 5 && deck.length > 0) {
-      const nextCard = deck[0];
-      setHand([...hand, nextCard]);
-      setDeck(deck.slice(1));
-      setVoluntad(v => v - 1);
-    }
-  };
-
-  // Función para jugar carta
-  const playCard = (slotIndex: number) => {
-    if (selectedHandCardIndex === null) return;
-
-    const card = hand[selectedHandCardIndex];
-    if (card.suit === 'jokers') return;
-
-    if (voluntad >= card.cost && !board[slotIndex].card) {
-      playSfx();
-      const newBoard = [...board];
-      newBoard[slotIndex] = { card, stack: [card] };
-      setBoard(newBoard);
-
-      const newHand = hand.filter((_, i) => i !== selectedHandCardIndex);
-      setHand(newHand);
-      setVoluntad(v => v - card.cost);
+      if (!isPlayerTurn) return;
+      if (gameState.playerAttackedIndices.includes(slotIndex)) return; // ya atacó
+      setSelectedAttackerIndex(prev => prev === slotIndex ? null : slotIndex);
       setSelectedHandCardIndex(null);
     }
   };
 
-  // Función para usar Joker
-  const useJoker = () => {
+  const handleOpponentSlotClick = (slotIndex: number) => {
+    const slot = opponentBoard[slotIndex];
+    if (selectedAttackerIndex !== null && slot.card) {
+      if (isOpponentSlotActiveToAttack(slotIndex)) {
+        const isMago = attackerCard?.role.toUpperCase() === 'MAGO';
+        const magoAttacksCount = (playerMagoAttacks[selectedAttackerIndex] || []).length;
+        
+        gameState.attackCard(true, selectedAttackerIndex, slotIndex);
+        
+        // Deseleccionar al atacante si no es un Mago, o si ya ha realizado su segundo ataque
+        if (!isMago || magoAttacksCount >= 1) {
+          setSelectedAttackerIndex(null);
+        }
+      } else if (attackerCard && voluntad < attackerCard.cost) {
+        const isMago = attackerCard.role.toUpperCase() === 'MAGO';
+        const hasAlreadyAttackedOnce = isMago && (playerMagoAttacks[selectedAttackerIndex] || []).length > 0;
+        if (!hasAlreadyAttackedOnce) {
+          setWarningText('Voluntad insuficiente');
+        }
+      }
+    } else {
+      if (slot.card) {
+        setViewingCard(slot.card);
+      }
+    }
+  };
+
+  const handleAttackDirectly = () => {
+    if (selectedAttackerIndex === null) return;
+
+    const isMago = attackerCard?.role.toUpperCase() === 'MAGO';
+    const magoAttacksCount = (playerMagoAttacks[selectedAttackerIndex] || []).length;
+    const hasAlreadyAttackedOnce = isMago && magoAttacksCount > 0;
+
+    // El segundo ataque del Mago es gratuito (no requiere voluntad)
+    if (!hasAlreadyAttackedOnce && attackerCard && voluntad < attackerCard.cost) {
+      setWarningText('Voluntad insuficiente');
+      return;
+    }
+
+    // Si el Mago ya atacó al jugador esta ronda, ignorar el clic sin deseleccionar
+    if (isMago && hasMagoAttackedTarget(true, selectedAttackerIndex, -1)) return;
+
+    // Si el Mago ya atacó una carta y el rival tiene 2+ cartas, debe atacar cartas (no al jugador)
+    if (isMago && hasAlreadyAttackedOnce && opponentBoard.filter(s => s.card).length >= 2) {
+      setWarningText('El Mago debe atacar a 2 cartas');
+      return;
+    }
+
+    gameState.attackDirectly(true, selectedAttackerIndex);
+
+    // Deseleccionar al atacante si no es un Mago, o si ya ha realizado su segundo ataque
+    if (!isMago || magoAttacksCount >= 1) {
+      setSelectedAttackerIndex(null);
+    }
+  };
+
+  const handleUseJoker = () => {
     if (selectedHandCardIndex === null) return;
-    const card = hand[selectedHandCardIndex];
-    if (card.suit !== 'jokers') return;
-
-    if (voluntad >= 1) {
-      playSfx();
-      const newHand = hand.filter((_, i) => i !== selectedHandCardIndex);
-      setHand(newHand);
-      setVoluntad(v => v - 1);
-      setSelectedHandCardIndex(null);
-    }
+    playSfx();
+    useJoker(true, selectedHandCardIndex);
+    setSelectedHandCardIndex(null);
   };
 
-  const endTurn = () => {
-    setVoluntad(v => Math.min(v + 2, 10));
-    if (board.filter(s => s.card).length === 0) {
-      setHp(prev => Math.max(0, prev - 10));
-    }
+  const handleDiscard = () => {
+    if (selectedHandCardIndex === null || playerHasDiscarded) return;
+    discardCard(true, selectedHandCardIndex);
+    setSelectedHandCardIndex(null);
   };
 
-  const selectedIsJoker = selectedHandCardIndex !== null && hand[selectedHandCardIndex].suit === 'jokers';
+  const handleDiscardDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOverDiscard(false);
+    if (draggingHandIndex === null || playerHasDiscarded) return;
+    discardCard(true, draggingHandIndex);
+    setDraggingHandIndex(null);
+    setSelectedHandCardIndex(null);
+  };
+
+  const handleEndTurn = () => {
+    playSfx();
+    endTurn(true);
+    setSelectedHandCardIndex(null);
+    setSelectedAttackerIndex(null);
+  };
+
+  const selectedHandCard = selectedHandCardIndex !== null ? hand[selectedHandCardIndex] : null;
+  const selectedIsJoker = selectedHandCard !== null && selectedHandCard.suit === 'jokers';
+  const canAffordSelected = selectedHandCard !== null;
+
+  const attackerCard = selectedAttackerIndex !== null ? board[selectedAttackerIndex]?.card : null;
+
+  const isOpponentSlotActiveToAttack = (slotIndex: number) => {
+    if (selectedAttackerIndex === null || !attackerCard) return false;
+
+    const isMago = attackerCard.role.toUpperCase() === 'MAGO';
+    const hasAlreadyAttackedOnce = isMago && (playerMagoAttacks[selectedAttackerIndex] || []).length > 0;
+    
+    // Solo verificar costo si no es el segundo ataque de un mago
+    if (!hasAlreadyAttackedOnce && voluntad < attackerCard.cost) return false; 
+
+    // Si el atacante es un mago, verificar que no haya atacado a este mismo objetivo en este turno
+    if (isMago) {
+      if (hasMagoAttackedTarget(true, selectedAttackerIndex, slotIndex)) return false;
+    }
+
+    // Solo asesino, tanque, tirador, pícaro, mago y sota pueden elegir a qué carta pegar
+    const TARGETING_ROLES = ['ASESINO', 'TANQUE', 'TIRADOR', 'PICARO', 'MAGO', 'SOTA'];
+    if (!TARGETING_ROLES.includes(attackerCard.role.toUpperCase())) {
+      // Si no es un rol de target, solo puede pegar a su propia columna vertical
+      if (selectedAttackerIndex !== slotIndex) return false;
+    }
+
+    // Restricciones:
+    if (attackerCard.attackType === 'SOPORTE') return false; // Soporte no ataca cartas
+    if (attackerCard.attackType === 'DIRECTO') return false; // Reyes no atacan cartas
+    if (attackerCard.attackType === 'COLUMNA' && selectedAttackerIndex !== slotIndex) return false; // Restricción de columna vertical
+    return true;
+  };
+
+  const canAttackDirectly = () => {
+    if (selectedAttackerIndex === null || !attackerCard) return false;
+    if (attackerCard.attackType === 'SOPORTE') return false;
+
+    const isMago = attackerCard.role.toUpperCase() === 'MAGO';
+    const hasAlreadyAttackedOnce = isMago && (playerMagoAttacks[selectedAttackerIndex] || []).length > 0;
+
+    if (!hasAlreadyAttackedOnce && voluntad < attackerCard.cost) return false;
+
+    if (isMago) {
+      if (hasMagoAttackedTarget(true, selectedAttackerIndex, -1)) return false;
+      // Mago solo puede atacar directo si el rival tiene menos de 2 cartas
+      return opponentBoard.filter(s => s.card).length < 2;
+    }
+
+    const TARGETING_ROLES = ['ASESINO', 'TANQUE', 'TIRADOR', 'PICARO', 'SOTA'];
+    const hasOpponentCards = opponentBoard.some(s => s.card);
+
+    if (TARGETING_ROLES.includes(attackerCard.role.toUpperCase())) {
+      if (hasOpponentCards) return false;
+    }
+
+    if (attackerCard.attackType === 'COLUMNA') {
+      return !opponentBoard[selectedAttackerIndex].card;
+    }
+
+    if (attackerCard.attackType === 'DIRECTO') return true;
+
+    return !hasOpponentCards;
+  };
+
+  const isAlliedSlotActiveToHeal = (slotIndex: number) => {
+    if (selectedAttackerIndex === null || !attackerCard) return false;
+    if (attackerCard.role !== 'CURANDERO') return false;
+    if (voluntad < attackerCard.cost) return false; // Voluntad insuficiente para curar
+    const slot = board[slotIndex];
+    return selectedAttackerIndex !== slotIndex && slot.card !== null;
+  };
 
   return (
     <motion.div 
@@ -221,17 +389,24 @@ const Game: React.FC = () => {
         </div>
 
         <div className="flex justify-around items-center w-full max-w-2xl gap-4 md:gap-12">
-          <div className="flex flex-col items-center flex-1">
-            <span className="text-[7px] md:text-[9px] text-red-500/80 uppercase tracking-[0.2em] mb-0.5">Oponente</span>
+          <div
+            onClick={selectedAttackerIndex !== null ? handleAttackDirectly : undefined}
+            className={`flex flex-col items-center flex-1 transition-all duration-300 ${canAttackDirectly() ? 'cursor-crosshair scale-105 border border-red-500/40 p-1 bg-red-950/20 rounded shadow-[0_0_15px_rgba(220,38,38,0.2)] animate-pulse' : ''}`}
+          >
+            <span className="text-[7px] md:text-[9px] text-red-500/80 uppercase tracking-[0.2em] mb-0.5">Oponente {!isPlayerTurn && '(Pensando...)'} {selectedAttackerIndex !== null && '🎯 ATACAR'}</span>
             <div className="w-full max-w-[120px] md:max-w-[180px] h-1.5 bg-red-950/30 rounded-full border border-red-900/20 relative overflow-hidden">
-              <motion.div className="absolute inset-0 bg-red-600 shadow-[0_0_8px_red]" animate={{ width: `${opponentHp}%` }} />
+              <motion.div className="absolute inset-0 bg-red-600 shadow-[0_0_8px_red]" animate={{ width: `${(opponentHp / MAX_HP) * 100}%` }} />
             </div>
+            {/* Opcional: mostrar voluntad del oponente (útil para debug o gameplay) */}
+            <span className="text-[6px] md:text-[8px] text-red-400 mt-1">Voluntad: {opponentVoluntad} / Mano: {opponentHand.length}</span>
           </div>
           <div className="text-xl font-black text-gold-gradient tracking-widest uppercase hidden md:block">REGNUM HOLLOW</div>
           <div className="flex flex-col items-center flex-1">
-            <span className="text-[7px] md:text-[9px] text-blue-400 uppercase tracking-[0.2em] mb-0.5">Jugador</span>
+            <span className={`text-[7px] md:text-[9px] ${isPlayerTurn ? 'text-blue-400' : 'text-blue-400/50'} uppercase tracking-[0.2em] mb-0.5`}>
+              Jugador {isPlayerTurn && '(Tu Turno)'}
+            </span>
             <div className="w-full max-w-[120px] md:max-w-[180px] h-1.5 bg-blue-950/30 rounded-full border border-blue-900/20 relative overflow-hidden">
-              <motion.div className="absolute inset-0 bg-blue-500 shadow-[0_0_8px_blue]" animate={{ width: `${hp}%` }} />
+              <motion.div className="absolute inset-0 bg-blue-500 shadow-[0_0_8px_blue]" animate={{ width: `${(hp / MAX_HP) * 100}%` }} />
             </div>
           </div>
         </div>
@@ -257,7 +432,14 @@ const Game: React.FC = () => {
       <main className="flex-1 relative z-10 flex flex-col justify-center items-center gap-2 md:gap-4 p-2 md:p-4 overflow-visible">
         <div className="flex justify-center gap-2 md:gap-4 w-full max-w-3xl overflow-visible">
           {opponentBoard.map((slot, i) => (
-            <BoardSlotView key={`opp-${i}`} slot={slot} isOpponent onSelect={handleSelectCard} />
+            <BoardSlotView
+              key={`opp-${i}`}
+              slot={slot}
+              isOpponent
+              onSelect={handleSelectCard}
+              isActiveToAttack={isOpponentSlotActiveToAttack(i) && slot.card !== null}
+              onClick={() => handleOpponentSlotClick(i)}
+            />
           ))}
         </div>
         <div className="w-[60%] max-w-xl h-px bg-gradient-to-r from-transparent via-white/10 to-transparent relative">
@@ -274,28 +456,57 @@ const Game: React.FC = () => {
               key={`player-${i}`}
               slot={slot}
               onSelect={handleSelectCard}
-              isActiveToPlay={selectedHandCardIndex !== null && !slot.card && !selectedIsJoker}
-              onClick={() => playCard(i)}
+              isAttacking={selectedAttackerIndex === i}
+              hasAttacked={gameState.playerAttackedIndices.includes(i)}
+              isActiveToPlay={selectedHandCardIndex !== null && !slot.card && !selectedIsJoker && canAffordSelected}
+              isActiveToHeal={isAlliedSlotActiveToHeal(i)}
+              onClick={() => handlePlayerSlotClick(i)}
             />
           ))}
         </div>
       </main>
 
       {/* FOOTER: Mano y Controles */}
-      <footer className="relative z-20 p-2 md:p-3 bg-gradient-to-t from-black via-black/95 to-transparent flex flex-col md:flex-row justify-center items-center gap-2 md:gap-6 shrink-0 border-t border-white/5 overflow-visible">
-        <div className="flex items-center gap-3 md:gap-6 w-full md:w-auto justify-center overflow-visible">
-          <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={() => {
-            playSfx();
-            drawCard();
-          }}>
-            <div className="w-10 h-15 sm:w-14 sm:h-21 md:w-18 md:h-28 border border-white/10 rounded-md bg-[#080808] flex items-center justify-center group-hover:border-primary-gold/50 transition-all shadow-2xl relative overflow-hidden shrink-0">
-              <Layers className="text-white/10 group-hover:text-primary-gold/40 transition-colors" size={16} />
-              <div className="absolute inset-0 bg-gradient-to-tr from-primary-gold/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+      <footer className={`relative z-20 p-2 md:p-3 bg-gradient-to-t from-black via-black/95 to-transparent flex flex-col md:flex-row justify-center items-center gap-2 md:gap-6 shrink-0 border-t border-white/5 overflow-visible transition-opacity duration-500 ${!isPlayerTurn ? 'opacity-50 pointer-events-none' : ''}`}>
+        <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto justify-center overflow-visible">
+          {/* Mazo + Pila de Descartes */}
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={handleDrawCard}>
+              <div className="w-10 sm:w-14 md:w-16 aspect-[2/3] border border-white/10 rounded-md bg-[#080808] flex items-center justify-center group-hover:border-primary-gold/50 transition-all shadow-2xl relative overflow-hidden shrink-0">
+                <Layers className="text-white/10 group-hover:text-primary-gold/40 transition-colors" size={16} />
+                <div className="absolute inset-0 bg-gradient-to-tr from-primary-gold/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <span className="text-[6px] md:text-[8px] uppercase tracking-widest text-gray-500 font-bold">Mazo | 1v</span>
             </div>
-            <span className="text-[6px] md:text-[8px] uppercase tracking-widest text-gray-500 font-bold">Mazo | 1v</span>
+
+            {/* Pila de Descartes (zona de arrastre) */}
+            <div
+              onDragOver={(e) => { e.preventDefault(); if (!playerHasDiscarded) setIsDragOverDiscard(true); }}
+              onDragLeave={() => setIsDragOverDiscard(false)}
+              onDrop={handleDiscardDrop}
+              className={`flex flex-col items-center gap-1 transition-opacity ${playerHasDiscarded ? 'opacity-40' : ''}`}
+            >
+              <div className={`w-10 sm:w-14 md:w-16 aspect-[2/3] border rounded-md relative overflow-hidden shrink-0 transition-all ${
+                isDragOverDiscard && !playerHasDiscarded
+                  ? 'border-red-400 bg-red-950/30 shadow-[0_0_12px_rgba(239,68,68,0.3)]'
+                  : 'border-white/10 bg-[#080808]'
+              }`}>
+                {discardPile.length > 0 ? (
+                  <>
+                    <img src={discardPile[discardPile.length - 1].image} className="w-full h-full object-cover opacity-50" />
+                    <div className="absolute bottom-0 right-0 bg-black/80 text-white/60 text-[7px] px-1 font-bold">{discardPile.length}</div>
+                  </>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-white/10 text-lg">⊗</div>
+                )}
+              </div>
+              <span className="text-[6px] md:text-[8px] uppercase tracking-widest text-gray-500 font-bold">
+                {playerHasDiscarded ? 'Descartada ✓' : 'Descarte'}
+              </span>
+            </div>
           </div>
 
-          <div className="flex gap-1 md:gap-3 items-end px-1 md:px-4 pt-4 md:pt-6 pb-1 overflow-x-auto overflow-y-visible max-w-[85vw] md:max-w-none scrollbar-hide">
+          <div className="flex gap-1 md:gap-3 items-end px-1 md:px-4 pt-4 md:pt-6 pb-1 overflow-x-auto overflow-y-visible max-w-[75vw] md:max-w-none scrollbar-hide">
             <AnimatePresence>
               {hand.map((card, i) => (
                 <GameCard
@@ -311,22 +522,22 @@ const Game: React.FC = () => {
                     playSfx();
                     setViewingCard(card);
                   }}
+                  draggable={!playerHasDiscarded}
+                  onDragStart={() => setDraggingHandIndex(i)}
+                  onDragEnd={() => setDraggingHandIndex(null)}
                 />
               ))}
             </AnimatePresence>
           </div>
         </div>
 
-        <div className="flex md:flex-col gap-2 md:gap-4 items-center w-full md:w-48 px-4 pb-2">
+        <div className="flex md:flex-col gap-2 md:gap-3 items-center w-full md:w-48 px-4 pb-2">
           <AnimatePresence mode="wait">
             {selectedIsJoker ? (
               <motion.button
                 key="use-joker"
                 initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-                onClick={() => {
-                  playSfx();
-                  useJoker();
-                }}
+                onClick={handleUseJoker}
                 className="flex-1 md:w-full py-2.5 md:py-4 px-4 bg-purple-600 text-white font-black uppercase tracking-widest rounded border border-purple-400 shadow-xl hover:bg-purple-500 transition-all text-[9px] md:text-xs flex flex-col items-center justify-center"
               >
                 <span>Usar Joker</span>
@@ -335,16 +546,28 @@ const Game: React.FC = () => {
               <motion.button
                 key="end-turn"
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                onClick={() => {
-                  playSfx();
-                  endTurn();
-                }}
+                onClick={handleEndTurn}
                 className="flex-1 md:w-full py-2.5 md:py-4 px-4 bg-primary-gold text-black font-black uppercase tracking-widest rounded hover:bg-white transition-all shadow-xl text-[9px] md:text-xs text-center"
               >
                 Pasar Turno
               </motion.button>
             )}
           </AnimatePresence>
+
+          {/* Botón DESCARTAR */}
+          <motion.button
+            onClick={handleDiscard}
+            disabled={selectedHandCardIndex === null || playerHasDiscarded}
+            className={`flex-1 md:w-full py-2.5 md:py-3 px-4 font-black uppercase tracking-widest rounded border text-[9px] md:text-xs text-center transition-all ${
+              playerHasDiscarded
+                ? 'bg-transparent text-gray-700 border-white/5 cursor-not-allowed'
+                : selectedHandCardIndex !== null
+                  ? 'bg-red-950/60 text-red-300 border-red-800/60 hover:bg-red-900/60 cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.15)]'
+                  : 'bg-transparent text-gray-600 border-white/10 cursor-not-allowed'
+            }`}
+          >
+            {playerHasDiscarded ? '✓ Descartada' : 'Descartar'}
+          </motion.button>
         </div>
       </footer>
 
@@ -385,6 +608,42 @@ const Game: React.FC = () => {
         )}
       </AnimatePresence>
 
+      {/* AVISOS DE JUEGO */}
+      <AnimatePresence>
+        {warningText && (
+          <motion.div
+            key={warningText}
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="fixed bottom-32 left-1/2 -translate-x-1/2 z-150 pointer-events-none"
+          >
+            <div className="flex items-center gap-2 bg-black/90 border border-primary-gold/40 rounded-lg px-4 py-2.5 shadow-[0_0_20px_rgba(166,138,100,0.2)] backdrop-blur-md">
+              <span className="text-primary-gold text-lg font-black">⚡</span>
+              <span className="text-primary-gold font-bold uppercase tracking-widest text-[10px] md:text-xs whitespace-nowrap">
+                {warningText}
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL FIN DE PARTIDA: VICTORIA / DERROTA */}
+      <AnimatePresence>
+        {gameOver && (
+          <GameOverOverlay
+            result={gameOver}
+            userName={user.name || 'Héroe'}
+            onRestart={() => {
+              navigate('/game');
+              window.location.reload();
+            }}
+            onMainMenu={() => navigate('/menu')}
+          />
+        )}
+      </AnimatePresence>
+
       {/* MODAL DE CONFIRMACIÓN DE RENDICIÓN */}
       <AnimatePresence>
         {showSurrenderModal && (
@@ -422,6 +681,10 @@ const Game: React.FC = () => {
                 <button
                   onClick={() => {
                     playSfx();
+                    if (!statsUpdated.current && !user.isGuest) {
+                      statsUpdated.current = true;
+                      updateMatchStats(user.name, 'lose');
+                    }
                     setShowSurrenderModal(false);
                     setIsSurrendering(true);
                   }}
@@ -449,13 +712,16 @@ const GameCard: React.FC<{
   isSelected?: boolean;
   onClick?: () => void;
   onRightClick?: (e: React.MouseEvent) => void;
-}> = ({ card, isSelected, onClick, onRightClick }) => {
+  draggable?: boolean;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+}> = ({ card, isSelected, onClick, onRightClick, draggable, onDragStart, onDragEnd }) => {
   return (
     <motion.div
       layout
       initial={{ opacity: 0, y: 30 }}
-      animate={{ 
-        opacity: 1, 
+      animate={{
+        opacity: 1,
         y: 0,
         scale: isSelected ? 1.1 : 1
       }}
@@ -467,6 +733,9 @@ const GameCard: React.FC<{
       `}
       onClick={onClick}
       onContextMenu={onRightClick}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
     >
       <div
         className={`w-full h-full relative rounded-md md:rounded-lg border-2 bg-[#080808] transition-all duration-500 
@@ -523,15 +792,27 @@ const BoardSlotView: React.FC<{
   isOpponent?: boolean;
   onSelect: (c: CardData) => void;
   isActiveToPlay?: boolean;
+  isAttacking?: boolean;
+  hasAttacked?: boolean;
+  isActiveToAttack?: boolean;
+  isActiveToHeal?: boolean;
   onClick?: () => void;
-}> = ({ slot, onSelect, isActiveToPlay, onClick }) => {
+}> = ({ slot, isOpponent, onSelect, isActiveToPlay, isAttacking, hasAttacked, isActiveToAttack, isActiveToHeal, onClick }) => {
   return (
     <div
       onClick={onClick}
       className={`
         flex-1 max-w-[70px] sm:max-w-[90px] md:max-w-[110px] lg:max-w-[120px] aspect-[2/3] rounded-lg border flex items-center justify-center relative transition-all duration-500
         ${slot.card
-          ? 'border-white/5'
+          ? isAttacking
+            ? 'border-green-500 bg-green-500/10 shadow-[0_0_15px_rgba(34,197,94,0.4)] scale-105 z-30'
+            : hasAttacked
+              ? 'border-white/5 opacity-60'
+              : isActiveToAttack
+                ? 'border-red-500 bg-red-500/15 animate-pulse cursor-crosshair shadow-[0_0_20px_rgba(239,68,68,0.4)] z-30'
+                : isActiveToHeal
+                  ? 'border-green-500 bg-green-500/15 animate-pulse cursor-pointer shadow-[0_0_20px_rgba(34,197,94,0.4)] z-30'
+                  : 'border-white/5 bg-white/[0.01]'
           : isActiveToPlay
             ? 'border-primary-gold bg-primary-gold/10 animate-pulse cursor-pointer shadow-lg'
             : 'border-white/5 bg-white/[0.01]'}
@@ -541,13 +822,14 @@ const BoardSlotView: React.FC<{
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
           className="w-full h-full relative group cursor-pointer overflow-visible"
-          onClick={(e) => { e.stopPropagation(); onSelect(slot.card!); }}
+          onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+          onContextMenu={(e) => { e.preventDefault(); onSelect(slot.card!); }}
         >
           <div
             className={`w-full h-full relative rounded-md md:rounded-lg border-2 bg-[#080808] transition-all duration-500 group-hover:-translate-y-2 md:group-hover:-translate-y-4 group-hover:z-50`}
             style={{
-              borderColor: `${suitColors[slot.card.suit]}88`,
-              boxShadow: `0 0 15px ${suitColors[slot.card.suit]}11`
+              borderColor: isAttacking ? '#22c55e' : isActiveToAttack ? '#ef4444' : isActiveToHeal ? '#22c55e' : `${suitColors[slot.card.suit]}88`,
+              boxShadow: isAttacking ? '0 0 15px rgba(34,197,94,0.3)' : isActiveToAttack ? '0 0 15px rgba(239,68,68,0.3)' : isActiveToHeal ? '0 0 15px rgba(34,197,94,0.3)' : `0 0 15px ${suitColors[slot.card.suit]}11`
             }}
           >
             <div className="w-full h-full overflow-hidden relative rounded-[inherit]">
@@ -584,9 +866,41 @@ const BoardSlotView: React.FC<{
               </div>
             </div>
           </div>
+
+          {/* Indicador de costo de voluntad en el tablero */}
+          <div className="absolute -top-1 -right-1 md:-top-2 md:-right-2 z-[60]">
+            <div
+              className="w-4 h-4 md:w-7 md:h-7 rounded-full bg-black/95 backdrop-blur-md flex items-center justify-center border md:border-2 shadow-2xl"
+              style={{ borderColor: suitColors[slot.card.suit] }}
+            >
+              <span className="text-[7px] md:text-xs font-bold" style={{ color: suitColors[slot.card.suit] }}>{slot.card.cost}</span>
+            </div>
+          </div>
+
           {slot.stack.length > 1 && (
             <div className="absolute -bottom-1 -right-1 w-4 h-4 md:w-6 md:h-6 rounded bg-primary-gold text-black flex items-center justify-center font-black text-[8px] md:text-xs border border-black z-[60]">
               +{slot.stack.length - 1}
+            </div>
+          )}
+
+          {/* Indicadores de estado: escudo, veneno, sangrado */}
+          {(slot.card.shield || !!slot.card.poisonTurns || !!slot.card.bleedTurns) && (
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-40 flex flex-col gap-0.5 items-center pointer-events-none">
+              {slot.card.shield && (
+                <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-yellow-400 border border-yellow-200 flex items-center justify-center shadow-[0_0_6px_rgba(234,179,8,0.8)]" title="Escudo">
+                  <span className="text-[6px] md:text-[8px] leading-none select-none">🛡</span>
+                </div>
+              )}
+              {!!slot.card.poisonTurns && (
+                <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-purple-600 border border-purple-400 flex items-center justify-center shadow-[0_0_6px_rgba(147,51,234,0.8)]" title={`Veneno (${slot.card.poisonTurns} turnos)`}>
+                  <span className="text-[6px] md:text-[8px] leading-none select-none font-bold text-white">{slot.card.poisonTurns}</span>
+                </div>
+              )}
+              {!!slot.card.bleedTurns && (
+                <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-red-600 border border-red-400 flex items-center justify-center shadow-[0_0_6px_rgba(220,38,38,0.8)]" title="Sangrado">
+                  <span className="text-[6px] md:text-[8px] leading-none select-none">🩸</span>
+                </div>
+              )}
             </div>
           )}
         </motion.div>

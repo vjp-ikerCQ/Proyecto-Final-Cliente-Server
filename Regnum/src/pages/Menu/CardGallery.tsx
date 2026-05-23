@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, X, ChevronLeft, ChevronRight, Volume2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { allCards, type CardData } from '../../utils/cardData';
+import { type CardData } from '../../utils/cardData';
 import { useSettings, SFX_KEYS } from '../../contexts/SettingsContext';
+import { fetchCards } from '../../services/cardsService';
 
 /**
  * Colores representativos para cada palo de la baraja
@@ -88,6 +89,7 @@ const CardGallery: React.FC = () => {
   const { settings } = useSettings();
   const [activeTab, setActiveTab] = useState<'TODAS' | 'ESPADAS' | 'COPAS' | 'OROS' | 'BASTOS' | 'JOKERS'>('TODAS');
   const [selectedCard, setSelectedCard] = useState<CardData | null>(null);
+  const [cards, setCards] = useState<CardData[]>([]);
 
   // Referencia para pausar/reiniciar el audio activo de la galería
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -126,9 +128,13 @@ const CardGallery: React.FC = () => {
     };
   }, [settings.isSfxEnabled, settings.sfxVolume]);
 
-  const filteredCards = activeTab === 'TODAS' 
-    ? allCards 
-    : allCards.filter(card => card.suit === activeTab.toLowerCase());
+  useEffect(() => {
+    fetchCards().then(setCards).catch(console.error);
+  }, []);
+
+  const filteredCards = activeTab === 'TODAS'
+    ? cards
+    : cards.filter(card => card.suit === activeTab.toLowerCase());
 
   const handlePrev = useCallback(() => {
     if (!selectedCard) return;
@@ -147,14 +153,22 @@ const CardGallery: React.FC = () => {
   // Soporte para teclado
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (selectedCard) {
+          setSelectedCard(null);
+        } else {
+          navigate('/menu');
+        }
+        return;
+      }
+
       if (!selectedCard) return;
       if (e.key === 'ArrowLeft') handlePrev();
       if (e.key === 'ArrowRight') handleNext();
-      if (e.key === 'Escape') setSelectedCard(null);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedCard, handlePrev, handleNext]);
+  }, [selectedCard, handlePrev, handleNext, navigate]);
 
   return (
     <div className="min-h-screen bg-bg-main text-text-main p-8 font-cinzel relative overflow-y-auto">
@@ -351,7 +365,7 @@ const CardGallery: React.FC = () => {
                 <div className="relative">
                    <div className="absolute -left-6 top-0 bottom-0 w-1 bg-primary-gold/20 hidden md:block" />
                    <p className="text-lg md:text-3xl text-secondary-theme font-light italic leading-relaxed md:pl-4">
-                      "{selectedCard.effect}"
+                      "{selectedCard.descripcion || selectedCard.effect}"
                    </p>
                 </div>
 
@@ -367,7 +381,7 @@ const CardGallery: React.FC = () => {
 
                 <button 
                   onClick={() => setSelectedCard(null)}
-                  className="flex items-center gap-3 text-muted hover:text-text-main transition-colors mx-auto md:mx-0 uppercase tracking-[0.3em] text-[10px] md:text-xs font-bold pt-10"
+                  className="flex items-center gap-3 text-muted hover:text-text-main transition-colors mx-auto md:mx-0 uppercase tracking-[0.3em] text-[10px] md:text-xs font-bold pt-10 cursor-pointer"
                 >
                   <X size={20} />
                   Cerrar Visualización
