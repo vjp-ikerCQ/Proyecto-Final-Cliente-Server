@@ -16,7 +16,8 @@ export const SFX_KEYS = {
   POWER_UP: 'https://res.cloudinary.com/drvgncidb/video/upload/v1779099971/powerUp_s09d5o.wav',
   JUMP: 'https://res.cloudinary.com/drvgncidb/video/upload/v1779099971/jump_rkds9x.wav',
   EXPLOSION: 'https://res.cloudinary.com/drvgncidb/video/upload/v1779099971/explosion_kmjzyu.wav',
-  HIT_HURT: 'https://res.cloudinary.com/drvgncidb/video/upload/v1779099971/hitHurt_upfnpu.wav'
+  HIT_HURT: 'https://res.cloudinary.com/drvgncidb/video/upload/v1779099971/hitHurt_upfnpu.wav',
+  SWORD_CLASH: 'https://res.cloudinary.com/drvgncidb/video/upload/v1/sword-clash_gj0zkn.mp3'
 };
 
 export const MUSIC_KEYS = {

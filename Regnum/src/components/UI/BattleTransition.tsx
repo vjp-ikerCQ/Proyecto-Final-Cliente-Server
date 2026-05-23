@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Sword, Shield } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useSettings, SFX_KEYS } from '../../contexts/SettingsContext';
 
 interface BattleTransitionProps {
   onComplete: () => void;
@@ -9,6 +10,8 @@ interface BattleTransitionProps {
 
 const BattleTransition: React.FC<BattleTransitionProps> = ({ onComplete }) => {
   const { t } = useTranslation();
+  const { playSfx } = useSettings();
+  const voicePlayedRef = useRef(false);
 
   useEffect(() => {
     // Total animation duration before calling onComplete
@@ -16,8 +19,32 @@ const BattleTransition: React.FC<BattleTransitionProps> = ({ onComplete }) => {
       onComplete();
     }, 2200);
 
-    return () => clearTimeout(timer);
-  }, [onComplete]);
+    // Play sword clash SFX exactly when the flash occurs (550ms delay)
+    const sfxTimer = setTimeout(() => {
+      playSfx(SFX_KEYS.SWORD_CLASH);
+    }, 550);
+
+    // Play a random narrator voice line on game start (begin, fight, prepare_yourself, ready)
+    if (!voicePlayedRef.current) {
+      voicePlayedRef.current = true;
+
+      const startVoices = [
+        'https://res.cloudinary.com/drvgncidb/video/upload/v1779449584/begin_jvixso.ogg',
+        'https://res.cloudinary.com/drvgncidb/video/upload/v1779449573/fight_yzyuvx.ogg',
+        'https://res.cloudinary.com/drvgncidb/video/upload/v1779449548/prepare_yourself_sfne13.ogg',
+        'https://res.cloudinary.com/drvgncidb/video/upload/v1779449543/ready_e6r9nr.ogg'
+      ];
+      const randomVoiceUrl = startVoices[Math.floor(Math.random() * startVoices.length)];
+      
+      // Play the selected narrator line
+      playSfx(randomVoiceUrl);
+    }
+
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(sfxTimer);
+    };
+  }, [onComplete, playSfx]);
 
   return (
     <motion.div
@@ -42,7 +69,7 @@ const BattleTransition: React.FC<BattleTransitionProps> = ({ onComplete }) => {
         <motion.div
           className="absolute text-primary-gold"
           initial={{ x: -300, y: -300, opacity: 0, rotate: -45 }}
-          animate={{ x: -25, y: -10, opacity: 1, rotate: 0 }}
+          animate={{ x: 15, y: -10, opacity: 1, rotate: 0 }}
           transition={{ delay: 0.4, type: "spring", stiffness: 250, damping: 20 }}
         >
           <Sword size={100} strokeWidth={1.5} className="drop-shadow-[0_0_10px_rgba(166,138,100,0.8)]" />
@@ -52,7 +79,7 @@ const BattleTransition: React.FC<BattleTransitionProps> = ({ onComplete }) => {
         <motion.div
           className="absolute text-primary-gold"
           initial={{ x: 300, y: -300, opacity: 0, rotate: 45, scaleX: -1 }}
-          animate={{ x: 25, y: -10, opacity: 1, rotate: 0, scaleX: -1 }}
+          animate={{ x: -15, y: -10, opacity: 1, rotate: 0, scaleX: -1 }}
           transition={{ delay: 0.4, type: "spring", stiffness: 250, damping: 20 }}
         >
           <Sword size={100} strokeWidth={1.5} className="drop-shadow-[0_0_10px_rgba(166,138,100,0.8)]" />
@@ -65,14 +92,14 @@ const BattleTransition: React.FC<BattleTransitionProps> = ({ onComplete }) => {
           animate={{ scale: [0, 2.5, 0], opacity: [0, 1, 0] }}
           transition={{ delay: 0.55, duration: 0.3, ease: "easeOut" }}
         />
-        
+
         {/* Screen Shake effect on the container */}
         <motion.div
           className="absolute inset-0 border-2 border-primary-gold/0 rounded-full"
-          animate={{ 
+          animate={{
             x: [0, -5, 5, -3, 3, 0],
             y: [0, 5, -5, 3, -3, 0],
-            opacity: [0, 0.5, 0] 
+            opacity: [0, 0.5, 0]
           }}
           transition={{ delay: 0.55, duration: 0.4 }}
         />

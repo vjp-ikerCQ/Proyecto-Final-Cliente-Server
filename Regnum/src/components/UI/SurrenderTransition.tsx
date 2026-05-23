@@ -1,20 +1,42 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ShieldOff } from 'lucide-react';
+import { useSettings } from '../../contexts/SettingsContext';
 
 interface SurrenderTransitionProps {
   onComplete: () => void;
 }
 
 const SurrenderTransition: React.FC<SurrenderTransitionProps> = ({ onComplete }) => {
+  const { playSfx, playMusic } = useSettings();
+  const voicePlayedRef = useRef(false);
+
   useEffect(() => {
     // Total animation duration before calling onComplete
     const timer = setTimeout(() => {
       onComplete();
     }, 2800);
 
+    if (!voicePlayedRef.current) {
+      voicePlayedRef.current = true;
+
+      // Play the battle lost background track (this automatically pauses the current battle music)
+      playMusic('https://res.cloudinary.com/drvgncidb/video/upload/v1779451448/battle_lost_bca6il.mp3');
+
+      // Play a random narrator voice line on surrender (gameover, loser, you_lose)
+      const surrenderVoices = [
+        'https://res.cloudinary.com/drvgncidb/video/upload/v1779449564/game_over_dmpjla.ogg',
+        'https://res.cloudinary.com/drvgncidb/video/upload/v1779449555/loser_qlvvhy.ogg',
+        'https://res.cloudinary.com/drvgncidb/video/upload/v1779449521/you_lose_micfug.ogg'
+      ];
+      const randomVoiceUrl = surrenderVoices[Math.floor(Math.random() * surrenderVoices.length)];
+
+      // Play the selected narrator line
+      playSfx(randomVoiceUrl);
+    }
+
     return () => clearTimeout(timer);
-  }, [onComplete]);
+  }, [onComplete, playSfx, playMusic]);
 
   return (
     <motion.div

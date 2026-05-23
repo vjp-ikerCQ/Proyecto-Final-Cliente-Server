@@ -16,6 +16,15 @@ const suitColors = {
   jokers: '#a855f7',
 };
 
+const tabDescriptions: Record<string, string> = {
+  TODAS: 'Explora la colección completa del Reino de Regnum. Visualiza todos los palos (Espadas, Copas, Oros, Bastos) y los poderosos Jokers.',
+  ESPADAS: 'El palo de la guerra y la fuerza. Las Espadas se especializan en hacer daño masivo de cruz e individual para diezmar las líneas enemigas.',
+  COPAS: 'El palo del misticismo y la curación. Las Copas controlan el campo de batalla restaurando salud a sus aliados y envenenando a los oponentes.',
+  OROS: 'El palo de la riqueza y la abundancia. Los Oros manipulan la Voluntad (maná), otorgando recursos adicionales al jugar o resolver sus habilidades.',
+  BASTOS: 'El palo del impacto y la defensa física. Los Bastos infligen daño colosal en área y aumentan la resistencia reduciendo el daño recibido.',
+  JOKERS: 'Comodines legendarios con efectos mágicos. Los Jokers no poseen estadísticas de combate directas, pero alteran el flujo del juego drásticamente.',
+};
+
 
 /**
  * Sub-componente reutilizable para una carta individual en la galería.
@@ -198,6 +207,28 @@ const CardGallery: React.FC = () => {
           </button>
         ))}
       </nav>
+
+      {/* Breve descripción/ayuda de la categoría seleccionada */}
+      <div className="relative z-10 max-w-2xl mx-auto -mt-8 mb-16 text-center px-4">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
+            className="p-4 rounded-xl border bg-panel-secondary/40 backdrop-blur-sm shadow-[0_0_20px_rgba(166,138,100,0.02)]"
+            style={{ borderColor: activeTab === 'TODAS' ? 'rgba(166,138,100,0.2)' : `${suitColors[activeTab.toLowerCase() as keyof typeof suitColors]}25` }}
+          >
+            <p className="text-[10px] md:text-xs uppercase tracking-[0.2em] font-spectral font-black mb-1.5" style={{ color: activeTab === 'TODAS' ? '#a68a64' : suitColors[activeTab.toLowerCase() as keyof typeof suitColors] }}>
+              {activeTab === 'TODAS' ? 'Colección General' : `Palo de ${activeTab}`}
+            </p>
+            <p className="text-xs md:text-sm text-gray-400 font-light italic leading-relaxed tracking-wider">
+              {tabDescriptions[activeTab]}
+            </p>
+          </motion.div>
+        </AnimatePresence>
+      </div>
 
       {/* Cuadrícula de Cartas (no-jokers) */}
       <main className="relative z-10 max-w-7xl mx-auto px-2 md:px-0 pb-20 space-y-6">

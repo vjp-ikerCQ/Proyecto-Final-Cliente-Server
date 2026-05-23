@@ -1,19 +1,43 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { useSettings } from '../../contexts/SettingsContext';
 
 interface GalleryTransitionProps {
   onComplete: () => void;
 }
 
 const GalleryTransition: React.FC<GalleryTransitionProps> = ({ onComplete }) => {
+  const { settings } = useSettings();
+  const hasPlayed = useRef(false);
+
   useEffect(() => {
     // Duración corta para el reparto de cartas (1.5s)
     const timer = setTimeout(() => {
       onComplete();
     }, 1500);
 
-    return () => clearTimeout(timer);
-  }, [onComplete]);
+    if (hasPlayed.current) return;
+    hasPlayed.current = true;
+
+    let audio: HTMLAudioElement | null = null;
+    if (settings.isSfxEnabled) {
+      audio = new Audio('https://res.cloudinary.com/drvgncidb/video/upload/v1779449354/card-shuffle_dyqs13.ogg');
+      audio.volume = settings.sfxVolume;
+      audio.play().catch(err => console.log("SFX play blocked by browser:", err));
+
+      // Limit audio playback to 1.5 seconds
+      setTimeout(() => {
+        if (audio) {
+          audio.pause();
+          audio.currentTime = 0;
+        }
+      }, 1500);
+    }
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [onComplete, settings.isSfxEnabled, settings.sfxVolume]);
 
   // Posiciones para las cartas siendo repartidas
   const cards = [
