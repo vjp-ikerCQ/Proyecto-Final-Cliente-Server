@@ -187,7 +187,7 @@ export default function AdminPanel() {
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [editingAttack, setEditingAttack] = useState(0);
   const [editingHealth, setEditingHealth] = useState(0);
-  const [editingEffect, setEditingEffect] = useState("");
+  const [editingCost, setEditingCost] = useState(0);
   const [editingDescription, setEditingDescription] = useState("");
 
   const handleSaveCard = (id: string) => {
@@ -202,7 +202,7 @@ export default function AdminPanel() {
             body: JSON.stringify({
               "habilidad.cantidad": editingAttack,
               "vida": editingHealth,
-              "habilidad.efecto": editingEffect,
+              "habilidad.voluntad": editingCost,
               "descripcion": editingDescription
             })
           });
@@ -210,15 +210,15 @@ export default function AdminPanel() {
 
           if (data.success) {
             const cardName = cards.find(c => String(c.id) === String(id))?.name || "Carta Desconocida";
-            setCards(cards.map(c => String(c.id) === String(id) ? { 
-              ...c, 
-              attack: editingAttack, 
-              health: editingHealth, 
-              effect: editingEffect,
+            setCards(cards.map(c => String(c.id) === String(id) ? {
+              ...c,
+              attack: editingAttack,
+              health: editingHealth,
+              cost: editingCost,
               descripcion: editingDescription
             } : c));
             setEditingCardId(null);
-            addAuditLog(`Modificada la carta '${cardName}' (ATK: ${editingAttack} -> ${editingAttack}, HP: ${editingHealth}).`);
+            addAuditLog(`Modificada la carta '${cardName}' (ATK: ${editingAttack}, HP: ${editingHealth}, Coste: ${editingCost}).`);
           } else {
             showAlert("Error", "Error al actualizar la carta.");
           }
@@ -803,8 +803,8 @@ export default function AdminPanel() {
                       <th className="py-3 px-4 cursor-pointer" onClick={() => handleSort('health')}>
                         Vida {sortField === 'health' && (sortOrder === 'asc' ? '↑' : '↓')}
                       </th>
-                      <th className="py-3 px-4 cursor-pointer" onClick={() => handleSort('effect')}>
-                        Efecto {sortField === 'effect' && (sortOrder === 'asc' ? '↑' : '↓')}
+                      <th className="py-3 px-4 cursor-pointer" onClick={() => handleSort('cost')}>
+                        Coste {sortField === 'cost' && (sortOrder === 'asc' ? '↑' : '↓')}
                       </th>
                       <th className="py-3 px-4 cursor-pointer" onClick={() => handleSort('descripcion')}>
                         Descripción {sortField === 'descripcion' && (sortOrder === 'asc' ? '↑' : '↓')}
@@ -845,15 +845,18 @@ export default function AdminPanel() {
                             c.health
                           )}
                         </td>
-                        <td className="py-3 px-4 text-muted text-sm max-w-xs">
+                        <td className="py-3 px-4 text-blue-400 font-bold">
                           {editingCardId === String(c.id) ? (
-                            <textarea 
-                              value={editingEffect} 
-                              onChange={(e) => setEditingEffect(e.target.value)}
-                              className="w-full bg-panel-secondary border border-primary-gold/50 rounded px-2 py-1 text-text-main focus:outline-none focus:border-primary-gold font-spectral h-12 resize-none"
+                            <input
+                              type="number"
+                              value={editingCost}
+                              onChange={(e) => setEditingCost(parseInt(e.target.value) || 0)}
+                              min={0}
+                              max={10}
+                              className="w-16 bg-panel-secondary border border-primary-gold/50 rounded px-2 py-1 text-text-main focus:outline-none focus:border-primary-gold font-spectral"
                             />
                           ) : (
-                            <span className="truncate block">{c.effect}</span>
+                            c.cost
                           )}
                         </td>
                         <td className="py-3 px-4 text-muted text-sm max-w-xs">
@@ -892,7 +895,7 @@ export default function AdminPanel() {
                                 setEditingCardId(String(c.id));
                                 setEditingAttack(c.attack);
                                 setEditingHealth(c.health);
-                                setEditingEffect(c.effect);
+                                setEditingCost(c.cost || 0);
                                 setEditingDescription(c.descripcion || "");
                               }}
                               className="p-2 hover:bg-surface-card rounded-full text-primary-gold cursor-pointer" 

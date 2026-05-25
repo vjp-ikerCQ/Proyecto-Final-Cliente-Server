@@ -72,13 +72,30 @@ export const useBotAI = ({
         actionTaken = true;
       }
 
-      // 2. Bajar Cartas
+      // 2. Bajar Cartas (slots vacíos primero)
       if (!actionTaken) {
         for (let i = 0; i < 3; i++) {
           if (!opponentBoard[i].card) {
             const playableIndex = opponentHand.findIndex(c => c.suit !== 'jokers');
             if (playableIndex !== -1) {
               playCard(false, i, playableIndex);
+              actionTaken = true;
+              break;
+            }
+          }
+        }
+      }
+
+      // 2b. Escaleras: apilar carta si el rango siguiente está en la mano
+      if (!actionTaken) {
+        for (let i = 0; i < 3; i++) {
+          const topCard = opponentBoard[i].card;
+          if (topCard && topCard.rank < 12) {
+            const ladderIdx = opponentHand.findIndex(
+              c => c.suit !== 'jokers' && c.rank === topCard.rank + 1
+            );
+            if (ladderIdx !== -1) {
+              playCard(false, i, ladderIdx);
               actionTaken = true;
               break;
             }

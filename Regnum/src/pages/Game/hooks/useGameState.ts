@@ -4,6 +4,23 @@ import { fetchShuffledDeck } from '../../../services/cardService';
 
 const TARGETING_ROLES = ['ASESINO', 'TANQUE', 'TIRADOR', 'PICARO', 'MAGO', 'SOTA'];
 
+type SynergyPalo = 'espadas' | 'copas' | 'oros' | 'bastos' | null;
+
+const detectBoardSynergy = (slots: { card: CardData | null }[]): SynergyPalo => {
+  const cards = slots.map(s => s.card);
+  if (cards.some(c => c === null)) return null;
+  const [c0, c1, c2] = cards as [CardData, CardData, CardData];
+  if (c0.suit === 'jokers') return null;
+  if (c0.suit !== c1.suit || c0.suit !== c2.suit) return null;
+  return c0.suit as SynergyPalo;
+};
+
+// Devuelve true si la carta puede apilarse sobre el slot (escalera: rank+1, no jokers, no rank 12)
+const canPlaceLadder = (card: CardData, slot: { card: CardData | null; stack: CardData[] }): boolean => {
+  if (!slot.card || slot.card.suit === 'jokers' || card.suit === 'jokers') return false;
+  return card.rank === slot.card.rank + 1 && slot.card.rank < 12;
+};
+
 export interface BoardSlot {
   card: CardData | null;
   stack: CardData[];
@@ -170,6 +187,9 @@ export const useGameState = () => {
     if (!targetSlot.card) return;
     const newBoard = [...targetBoard];
     const remaining = targetSlot.card.health - amount;
+    if (remaining <= 0 && targetSlot.stack.length > 0) {
+      setDiscardPile(prev => [...prev, ...targetSlot.stack]);
+    }
     newBoard[slotIndex] = remaining <= 0
       ? { card: null, stack: [] }
       : { ...targetSlot, card: { ...targetSlot.card, health: remaining } };
@@ -181,29 +201,46 @@ export const useGameState = () => {
     if (isPlayer) {
       const card = hand[handCardIndex];
       if (card.suit === 'jokers') return;
+      const slot = board[slotIndex];
 
-      if (!board[slotIndex].card) {
+      if (!slot.card) {
         const newBoard = [...board];
         newBoard[slotIndex] = { card, stack: [card] };
         setBoard(newBoard);
         setHand(prev => prev.filter((_, i) => i !== handCardIndex));
         applyStartDmg(card, slotIndex, true);
+      } else if (canPlaceLadder(card, slot)) {
+        // Escalera: apilar carta sobre la existente con bonus de ATK
+        const bonus = slot.stack.length; // cards below = bonus for this card
+        const stackedCard: CardData = { ...card, ladderBonus: (card.ladderBonus || 0) + bonus };
+        const newBoard = [...board];
+        newBoard[slotIndex] = { card: stackedCard, stack: [...slot.stack, stackedCard] };
+        setBoard(newBoard);
+        setHand(prev => prev.filter((_, i) => i !== handCardIndex));
       }
     } else {
       const card = opponentHand[handCardIndex];
       if (card.suit === 'jokers') return;
+      const slot = opponentBoard[slotIndex];
 
-      if (!opponentBoard[slotIndex].card) {
+      if (!slot.card) {
         const newBoard = [...opponentBoard];
         newBoard[slotIndex] = { card, stack: [card] };
         setOpponentBoard(newBoard);
         setOpponentHand(prev => prev.filter((_, i) => i !== handCardIndex));
         applyStartDmg(card, slotIndex, false);
+      } else if (canPlaceLadder(card, slot)) {
+        const bonus = slot.stack.length;
+        const stackedCard: CardData = { ...card, ladderBonus: (card.ladderBonus || 0) + bonus };
+        const newBoard = [...opponentBoard];
+        newBoard[slotIndex] = { card: stackedCard, stack: [...slot.stack, stackedCard] };
+        setOpponentBoard(newBoard);
+        setOpponentHand(prev => prev.filter((_, i) => i !== handCardIndex));
       }
     }
   };
 
-  // Usar Joker (jugador o bot)
+  // Usar Joker (jugador o bot) — la carta joker va a la pila de descartes
   const useJoker = (isPlayer: boolean, handCardIndex: number) => {
     if (isPlayer) {
       const card = hand[handCardIndex];
@@ -211,6 +248,7 @@ export const useGameState = () => {
 
       if (voluntad >= 1) {
         setHand(prev => prev.filter((_, i) => i !== handCardIndex));
+        setDiscardPile(prev => [...prev, card]);
         setVoluntad(v => v - 1);
       }
     } else {
@@ -219,9 +257,56 @@ export const useGameState = () => {
 
       if (opponentVoluntad >= 1) {
         setOpponentHand(prev => prev.filter((_, i) => i !== handCardIndex));
+        setDiscardPile(prev => [...prev, card]);
         setOpponentVoluntad(v => v - 1);
       }
     }
+  };
+
+  // Joker 3 — Resurrección: saca una carta aleatoria de la pila de descartes y la añade a la mano del jugador
+  // Devuelve false si la pila estaba vacía
+  const joker3Resurrect = (): boolean => {
+    if (discardPile.length === 0) return false;
+    const idx = Math.floor(Math.random() * discardPile.length);
+    const card = discardPile[idx];
+    // La carta revive con la vida máxima
+    const revivedCard: CardData = {
+      ...card,
+      health: card.maxHealth ?? getMaxHealthByRank(card.rank),
+      poisonTurns: undefined,
+      bleedTurns: undefined,
+      shield: undefined,
+    };
+    setDiscardPile(prev => prev.filter((_, i) => i !== idx));
+    setHand(prev => [...prev, revivedCard]);
+    return true;
+  };
+
+  // Joker 2 — Retorno: intercambia una carta del tablero con una de la mano.
+  // Si handCardIndex no se proporciona, simplemente devuelve la carta del tablero a la mano.
+  // Devuelve 'ok', 'ladder' (escalera bloqueada) o 'no_card' (slot vacío).
+  type Joker2Result = 'ok' | 'ladder' | 'no_card';
+  const joker2Swap = (boardSlotIndex: number, handCardIndex?: number): Joker2Result => {
+    const slot = board[boardSlotIndex];
+    if (!slot.card) return 'no_card';
+    if (slot.stack.length > 1) return 'ladder';
+
+    const boardCard = slot.card;
+    const newBoard = [...board];
+
+    if (handCardIndex !== undefined) {
+      const handCard = hand[handCardIndex];
+      newBoard[boardSlotIndex] = { card: handCard, stack: [handCard] };
+      setBoard(newBoard);
+      setHand(prev => prev.map((c, i) => (i === handCardIndex ? boardCard : c)));
+    } else {
+      // Solo devolver la carta del tablero a la mano
+      newBoard[boardSlotIndex] = { card: null, stack: [] };
+      setBoard(newBoard);
+      setHand(prev => [...prev, boardCard]);
+    }
+
+    return 'ok';
   };
 
   // Descartar una carta de la mano (solo jugador, máx 1 por ronda, coste 0)
@@ -254,6 +339,9 @@ export const useGameState = () => {
     const attackerSlot = attackerBoard[attackerSlotIndex];
     const targetSlot = defenderBoard[targetSlotIndex];
     if (!attackerSlot.card || !targetSlot.card) return;
+
+    const attackerSynergy = detectBoardSynergy(attackerBoard);
+    const defenderSynergy = detectBoardSynergy(defenderBoard);
 
     const attackerCard = attackerSlot.card;
     const isAsDeOros = attackerCard.rank === 1 && attackerCard.suit === 'oros';
@@ -302,10 +390,17 @@ export const useGameState = () => {
       damageNum = parseInt(attackerCard.attack, 10) || 0;
     }
 
+    // Bonus de espadas: +1 de daño en todos los ataques
+    if (attackerSynergy === 'espadas' && !isHalf) damageNum += 1;
+    // Bonus de escalera: +N de daño por cartas apiladas bajo la carta atacante
+    damageNum += attackerCard.ladderBonus || 0;
+
     // Modificadores de estado sobre el objetivo (escudo y sangrado)
     const targetCard = targetSlot.card;
     let effectiveDamage = damageNum;
     if (targetCard.shield) effectiveDamage = Math.max(0, effectiveDamage - 1);
+    // Bonus de bastos defensor: -1 de daño recibido a todas las cartas
+    if (defenderSynergy === 'bastos') effectiveDamage = Math.max(0, effectiveDamage - 1);
     if ((targetCard.bleedTurns ?? 0) > 0) effectiveDamage += 1;
 
     const remainingHealth = targetHealth - effectiveDamage;
@@ -321,10 +416,12 @@ export const useGameState = () => {
           const tCard = newDefenderBoard[i].card!;
           let eDamage = damageNum;
           if (tCard.shield) eDamage = Math.max(0, eDamage - 1);
+          if (defenderSynergy === 'bastos') eDamage = Math.max(0, eDamage - 1);
           if ((tCard.bleedTurns ?? 0) > 0) eDamage += 1;
           const rHealth = tCard.health - eDamage;
 
           if (rHealth <= 0) {
+            setDiscardPile(prev => [...prev, ...newDefenderBoard[i].stack]);
             newDefenderBoard[i] = { card: null, stack: [] };
           } else {
             let uTarget: CardData = { ...tCard, health: rHealth };
@@ -337,6 +434,7 @@ export const useGameState = () => {
       }
     } else {
       if (remainingHealth <= 0) {
+        setDiscardPile(prev => [...prev, ...newDefenderBoard[targetSlotIndex].stack]);
         newDefenderBoard[targetSlotIndex] = { card: null, stack: [] };
       } else {
         let updatedTarget: CardData = { ...targetCard, health: remainingHealth };
@@ -355,10 +453,12 @@ export const useGameState = () => {
             const sideCard = newDefenderBoard[idx].card!;
             let eDamage = damageNum;
             if (sideCard.shield) eDamage = Math.max(0, eDamage - 1);
+            if (defenderSynergy === 'bastos') eDamage = Math.max(0, eDamage - 1);
             if ((sideCard.bleedTurns ?? 0) > 0) eDamage += 1;
             const rHealth = sideCard.health - eDamage;
 
             if (rHealth <= 0) {
+              setDiscardPile(prev => [...prev, ...newDefenderBoard[idx].stack]);
               newDefenderBoard[idx] = { card: null, stack: [] };
             } else {
               let uTarget: CardData = { ...sideCard, health: rHealth };
@@ -455,6 +555,8 @@ export const useGameState = () => {
     const attackerSlot = attackerBoard[attackerSlotIndex];
     if (!attackerSlot.card) return;
 
+    const attackerSynergy = detectBoardSynergy(attackerBoard);
+
     const attackerCard = attackerSlot.card;
 
     // Si es un mago, verificar que no ataque al mismo objetivo (la cara) dos veces en el mismo turno
@@ -499,6 +601,11 @@ export const useGameState = () => {
     } else if (typeof attackerCard.attack === 'string') {
       damageNum = parseInt(attackerCard.attack, 10) || 0;
     }
+
+    // Bonus de espadas: +1 de daño al atacar directo
+    if (attackerSynergy === 'espadas' && !isHalf) damageNum += 1;
+    // Bonus de escalera: +N de daño por cartas apiladas bajo la carta atacante
+    damageNum += attackerCard.ladderBonus || 0;
 
     const setDefenderHp = isPlayer ? setOpponentHp : setHp;
     setDefenderHp(prev => Math.max(0, prev - damageNum));
@@ -623,34 +730,60 @@ export const useGameState = () => {
 
   // Finalizar turno (jugador o bot)
   const endTurn = (isPlayer: boolean) => {
-    // Aplica veneno (1 dmg/turno) y elimina sangrado en el tablero indicado
-    const applyTurnEndEffects = (prev: BoardSlot[]): BoardSlot[] =>
-      prev.map(slot => {
+    // Aplica veneno y sangrado; recoge muertes para el discard; si hasCopasBonus, purga y cura
+    const applyTurnEndEffects = (
+      prev: BoardSlot[],
+      hasCopasBonus: boolean = false
+    ): { newBoard: BoardSlot[]; deaths: CardData[] } => {
+      const deaths: CardData[] = [];
+      const newBoard = prev.map(slot => {
         if (!slot.card) return slot;
         let card = { ...slot.card };
+        if (hasCopasBonus) {
+          card = { ...card, poisonTurns: 0, bleedTurns: 0 };
+        }
         if (card.poisonTurns && card.poisonTurns > 0) {
           card = { ...card, health: card.health - 1, poisonTurns: card.poisonTurns - 1 };
         }
         if (card.bleedTurns && card.bleedTurns > 0) card = { ...card, bleedTurns: card.bleedTurns - 1 };
-        if (card.health <= 0) return { card: null, stack: [] };
+        if (card.health <= 0) {
+          deaths.push(...slot.stack);
+          return { card: null, stack: [] };
+        }
+        if (hasCopasBonus) {
+          const maxHp = card.maxHealth ?? getMaxHealthByRank(card.rank);
+          card = { ...card, health: Math.min(maxHp, card.health + 1) };
+        }
         return { ...slot, card };
       });
+      return { newBoard, deaths };
+    };
 
     if (isPlayer) {
+      const playerSynergy = detectBoardSynergy(board);
+      const opponentSynergy = detectBoardSynergy(opponentBoard);
       const bonus = clerigoPassiveBonus(board);
-      setVoluntad(v => Math.min(v + 2 + bonus, 10));
+      const oroBonus = playerSynergy === 'oros' ? 1 : 0;
+      setVoluntad(v => Math.min(v + 2 + bonus + oroBonus, 10));
       setPlayerAttackedIndices([]);
       setPlayerMagoAttacks({});
       setPlayerHasDiscarded(false);
       setIsPlayerTurn(false);
-      setOpponentBoard(applyTurnEndEffects);
+      const { newBoard: newOppBoard, deaths: oppDeaths } = applyTurnEndEffects(opponentBoard, opponentSynergy === 'copas');
+      setOpponentBoard(newOppBoard);
+      if (oppDeaths.length > 0) setDiscardPile(prev => [...prev, ...oppDeaths]);
     } else {
+      const opponentSynergy = detectBoardSynergy(opponentBoard);
+      const playerSynergy = detectBoardSynergy(board);
       const bonus = clerigoPassiveBonus(opponentBoard);
-      setOpponentVoluntad(v => Math.min(v + 2 + bonus, 10));
+      const oroBonus = opponentSynergy === 'oros' ? 1 : 0;
+      setOpponentVoluntad(v => Math.min(v + 2 + bonus + oroBonus, 10));
       setOpponentAttackedIndices([]);
       setOpponentMagoAttacks({});
       setIsPlayerTurn(true);
-      setBoard(applyTurnEndEffects);
+      const { newBoard: newPlayerBoard, deaths: playerDeaths } = applyTurnEndEffects(board, playerSynergy === 'copas');
+      setBoard(newPlayerBoard);
+      if (playerDeaths.length > 0) setDiscardPile(prev => [...prev, ...playerDeaths]);
     }
   };
 
@@ -691,6 +824,8 @@ export const useGameState = () => {
     hasMagoAttackedTarget,
     playerHasDiscarded,
     discardCard,
-    discardPile
+    discardPile,
+    joker3Resurrect,
+    joker2Swap,
   };
 };

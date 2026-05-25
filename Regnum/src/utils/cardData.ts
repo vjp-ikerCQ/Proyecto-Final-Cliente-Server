@@ -22,6 +22,7 @@ export interface CardData {
   shield?: boolean;        // Escudo activo (reduce 1 dmg recibido, desaparece al recibir golpe)
   poisonTurns?: number;    // Turnos de veneno restantes (1 dmg/turno)
   bleedTurns?: number;     // Turnos de sangrado restantes (+1 dmg al siguiente golpe recibido)
+  ladderBonus?: number;    // Bonus de ATK acumulado por la mecánica de escalera
 }
 
 /**

@@ -5,9 +5,11 @@ import { useNavigate } from 'react-router-dom';
 import { type CardData } from '../../utils/cardData';
 import { useGameState, type BoardSlot } from './hooks/useGameState';
 import { useBotAI } from './hooks/useBotAI';
+import { useSuitSynergy } from './hooks/useSuitSynergy';
 import AtmosphereParticles from '../../components/AtmosphereParticles';
 import { updateMatchStats } from '../../services/userService';
 import { GameOverOverlay } from './components/GameOverOverlay';
+import { JokerAnimationOverlay } from './components/JokerAnimationOverlay';
 
 const MAX_HP = 30;
 
@@ -56,8 +58,15 @@ const Game: React.FC<GameProps> = ({ user }) => {
     hasMagoAttackedTarget,
     playerHasDiscarded,
     discardCard,
-    discardPile
+    discardPile,
+    joker3Resurrect,
+    joker2Swap,
   } = gameState;
+
+  const { playerSynergy, opponentSynergy } = useSuitSynergy({
+    playerBoard: board,
+    opponentBoard,
+  });
 
   useBotAI({
     isPlayerTurn,
@@ -94,6 +103,13 @@ const Game: React.FC<GameProps> = ({ user }) => {
   const [isDragOverDiscard, setIsDragOverDiscard] = useState(false);
   const [gameOver, setGameOver] = useState<'victory' | 'defeat' | null>(null);
   const statsUpdated = useRef(false);
+
+  // Estado de animación y flujo de Jokers 2 y 3
+  const [jokerAnim, setJokerAnim] = useState<{ card: CardData; rank: number } | null>(null);
+  // joker2Phase: 'board' = esperando que el jugador elija slot del tablero;
+  //              'hand'  = esperando que elija carta de la mano para intercambiar
+  const [joker2Phase, setJoker2Phase] = useState<'board' | 'hand' | null>(null);
+  const [joker2BoardSlot, setJoker2BoardSlot] = useState<number | null>(null);
 
   useEffect(() => {
     if (voluntad < 5) {
@@ -135,6 +151,41 @@ const Game: React.FC<GameProps> = ({ user }) => {
 
   const handlePlayerSlotClick = (slotIndex: number) => {
     const slot = board[slotIndex];
+
+    // ── Joker 2: fase de selección de slot del tablero ──
+    if (joker2Phase === 'board') {
+      if (!slot.card) {
+        setWarningText('No hay carta en ese slot');
+        return;
+      }
+      if (slot.stack.length > 1) {
+        setWarningText('No se puede intercambiar una carta en escalera');
+        return;
+      }
+      setJoker2BoardSlot(slotIndex);
+      setJoker2Phase('hand');
+      return;
+    }
+
+    // ── Joker 2: fase de selección de carta de la mano (clic en tablero → deseleccionar slot) ──
+    if (joker2Phase === 'hand') {
+      if (slotIndex === joker2BoardSlot) {
+        // Click en el mismo slot = volver a la fase de selección
+        setJoker2Phase('board');
+        setJoker2BoardSlot(null);
+      }
+      return;
+    }
+
+    // Escalera: carta seleccionada puede apilarse sobre la carta del slot
+    if (selectedHandCardIndex !== null && !selectedIsJoker && slot.card) {
+      const selectedCard = hand[selectedHandCardIndex];
+      if (selectedCard && selectedCard.rank === slot.card.rank + 1 && slot.card.rank < 12) {
+        handlePlayCard(slotIndex);
+        return;
+      }
+    }
+
     if (!slot.card) {
       if (selectedHandCardIndex !== null) {
         handlePlayCard(slotIndex);
@@ -220,8 +271,41 @@ const Game: React.FC<GameProps> = ({ user }) => {
 
   const handleUseJoker = () => {
     if (selectedHandCardIndex === null) return;
-    useJoker(true, selectedHandCardIndex);
-    setSelectedHandCardIndex(null);
+    const card = hand[selectedHandCardIndex];
+    if (!card || card.suit !== 'jokers') return;
+
+    if (card.rank === 2 || card.rank === 3) {
+      // Guarda datos para la animación antes de sacar la carta de la mano
+      setJokerAnim({ card, rank: card.rank });
+      useJoker(true, selectedHandCardIndex); // saca carta, -1 voluntad, añade al discard
+      setSelectedHandCardIndex(null);
+    } else {
+      // Joker 1 u otros: comportamiento actual sin animación
+      useJoker(true, selectedHandCardIndex);
+      setSelectedHandCardIndex(null);
+    }
+  };
+
+  // Llamado cuando termina la animación de Phaser del joker
+  const handleJokerAnimComplete = () => {
+    const rank = jokerAnim?.rank ?? null;
+    setJokerAnim(null);
+    if (rank === 3) {
+      const success = joker3Resurrect();
+      if (!success) setWarningText('Pila de descartes vacía — Joker usado en vano');
+    } else if (rank === 2) {
+      setJoker2Phase('board');
+    }
+  };
+
+  // Cancela la selección del Joker 2 (sin intercambio o devolviendo la carta ya seleccionada)
+  const handleJoker2Cancel = () => {
+    if (joker2Phase === 'hand' && joker2BoardSlot !== null) {
+      // Ya habíamos seleccionado un slot → devolver esa carta a la mano sin intercambio
+      joker2Swap(joker2BoardSlot);
+    }
+    setJoker2Phase(null);
+    setJoker2BoardSlot(null);
   };
 
   const handleDiscard = () => {
@@ -243,11 +327,41 @@ const Game: React.FC<GameProps> = ({ user }) => {
     endTurn(true);
     setSelectedHandCardIndex(null);
     setSelectedAttackerIndex(null);
+    setJoker2Phase(null);
+    setJoker2BoardSlot(null);
+  };
+
+  // Clic en carta de la mano — distingue si estamos en modo Joker 2 (intercambio)
+  const handleHandCardClick = (i: number) => {
+    if (joker2Phase === 'hand' && joker2BoardSlot !== null) {
+      const card = hand[i];
+      if (card.suit === 'jokers') {
+        setWarningText('No puedes intercambiar un Joker');
+        return;
+      }
+      const result = joker2Swap(joker2BoardSlot, i);
+      if (result === 'ladder') {
+        setWarningText('No se puede intercambiar una carta en escalera');
+        return;
+      }
+      setJoker2Phase(null);
+      setJoker2BoardSlot(null);
+      return;
+    }
+    setSelectedHandCardIndex(selectedHandCardIndex === i ? null : i);
   };
 
   const selectedHandCard = selectedHandCardIndex !== null ? hand[selectedHandCardIndex] : null;
   const selectedIsJoker = selectedHandCard !== null && selectedHandCard.suit === 'jokers';
   const canAffordSelected = selectedHandCard !== null;
+
+  const isActiveToStackLadder = (slotIndex: number): boolean => {
+    if (selectedHandCardIndex === null || selectedIsJoker) return false;
+    const card = hand[selectedHandCardIndex];
+    const slot = board[slotIndex];
+    if (!slot.card || slot.card.rank >= 12) return false;
+    return card.rank === slot.card.rank + 1;
+  };
 
   const attackerCard = selectedAttackerIndex !== null ? board[selectedAttackerIndex]?.card : null;
 
@@ -403,7 +517,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
 
       {/* TABLERO */}
       <main className="flex-1 relative z-10 flex flex-col justify-center items-center gap-2 md:gap-4 p-2 md:p-4 overflow-visible">
-        <div className="flex justify-center gap-2 md:gap-4 w-full max-w-3xl overflow-visible">
+        <div className="relative flex justify-center gap-2 md:gap-4 w-full max-w-3xl overflow-visible">
           {opponentBoard.map((slot, i) => (
             <BoardSlotView
               key={`opp-${i}`}
@@ -412,8 +526,14 @@ const Game: React.FC<GameProps> = ({ user }) => {
               onSelect={setViewingCard}
               isActiveToAttack={isOpponentSlotActiveToAttack(i) && slot.card !== null}
               onClick={() => handleOpponentSlotClick(i)}
+              synergyGlow={opponentSynergy.isActive ? opponentSynergy.suit : null}
             />
           ))}
+          <AnimatePresence>
+            {opponentSynergy.isActive && opponentSynergy.suit && (
+              <SynergyBadge suit={opponentSynergy.suit} isOpponent />
+            )}
+          </AnimatePresence>
         </div>
         <div className="w-[60%] max-w-xl h-px bg-gradient-to-r from-transparent via-white/10 to-transparent relative">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#050505] px-2 md:px-3 py-0.5 border border-white/5 rounded-full flex items-center gap-1 md:gap-2 shadow-2xl">
@@ -423,7 +543,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
             <Swords size={9} className="text-white/20 md:w-3.5 md:h-3.5" />
           </div>
         </div>
-        <div className="flex justify-center gap-2 md:gap-4 w-full max-w-3xl overflow-visible">
+        <div className="relative flex justify-center gap-2 md:gap-4 w-full max-w-3xl overflow-visible">
           {board.map((slot, i) => (
             <BoardSlotView
               key={`player-${i}`}
@@ -431,11 +551,22 @@ const Game: React.FC<GameProps> = ({ user }) => {
               onSelect={setViewingCard}
               isAttacking={selectedAttackerIndex === i}
               hasAttacked={gameState.playerAttackedIndices.includes(i)}
-              isActiveToPlay={selectedHandCardIndex !== null && !slot.card && !selectedIsJoker && canAffordSelected}
+              isActiveToPlay={selectedHandCardIndex !== null && !slot.card && !selectedIsJoker && canAffordSelected && joker2Phase === null}
               isActiveToHeal={isAlliedSlotActiveToHeal(i)}
+              isActiveToStack={isActiveToStackLadder(i) && joker2Phase === null}
+              isJoker2Target={
+                (joker2Phase === 'board' && slot.card !== null && slot.stack.length === 1) ||
+                (joker2Phase === 'hand' && joker2BoardSlot === i)
+              }
               onClick={() => handlePlayerSlotClick(i)}
+              synergyGlow={playerSynergy.isActive ? playerSynergy.suit : null}
             />
           ))}
+          <AnimatePresence>
+            {playerSynergy.isActive && playerSynergy.suit && (
+              <SynergyBadge suit={playerSynergy.suit} />
+            )}
+          </AnimatePresence>
         </div>
       </main>
 
@@ -486,12 +617,13 @@ const Game: React.FC<GameProps> = ({ user }) => {
                   key={`${card.id}-${i}`}
                   card={card}
                   isSelected={selectedHandCardIndex === i}
-                  onClick={() => setSelectedHandCardIndex(selectedHandCardIndex === i ? null : i)}
+                  isJoker2Swap={joker2Phase === 'hand' && card.suit !== 'jokers'}
+                  onClick={() => handleHandCardClick(i)}
                   onRightClick={(e) => {
                     e.preventDefault();
                     setViewingCard(card);
                   }}
-                  draggable={!playerHasDiscarded}
+                  draggable={!playerHasDiscarded && joker2Phase === null}
                   onDragStart={() => setDraggingHandIndex(i)}
                   onDragEnd={() => setDraggingHandIndex(null)}
                 />
@@ -502,7 +634,17 @@ const Game: React.FC<GameProps> = ({ user }) => {
 
         <div className="flex md:flex-col gap-2 md:gap-3 items-center w-full md:w-48 px-4 pb-2">
           <AnimatePresence mode="wait">
-            {selectedIsJoker ? (
+            {joker2Phase !== null ? (
+              /* Modo Joker 2: solo se muestra el botón de cancelar */
+              <motion.button
+                key="joker2-cancel"
+                initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+                onClick={handleJoker2Cancel}
+                className="flex-1 md:w-full py-2.5 md:py-4 px-4 bg-purple-950/60 text-purple-300 font-black uppercase tracking-widest rounded border border-purple-700/60 shadow-xl hover:bg-purple-900/60 transition-all text-[9px] md:text-xs text-center"
+              >
+                Cancelar Joker
+              </motion.button>
+            ) : selectedIsJoker ? (
               <motion.button
                 key="use-joker"
                 initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
@@ -523,20 +665,22 @@ const Game: React.FC<GameProps> = ({ user }) => {
             )}
           </AnimatePresence>
 
-          {/* Botón DESCARTAR */}
-          <motion.button
-            onClick={handleDiscard}
-            disabled={selectedHandCardIndex === null || playerHasDiscarded}
-            className={`flex-1 md:w-full py-2.5 md:py-3 px-4 font-black uppercase tracking-widest rounded border text-[9px] md:text-xs text-center transition-all ${
-              playerHasDiscarded
-                ? 'bg-transparent text-gray-700 border-white/5 cursor-not-allowed'
-                : selectedHandCardIndex !== null
-                  ? 'bg-red-950/60 text-red-300 border-red-800/60 hover:bg-red-900/60 cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.15)]'
-                  : 'bg-transparent text-gray-600 border-white/10 cursor-not-allowed'
-            }`}
-          >
-            {playerHasDiscarded ? '✓ Descartada' : 'Descartar'}
-          </motion.button>
+          {/* Botón DESCARTAR (oculto durante Joker 2) */}
+          {joker2Phase === null && (
+            <motion.button
+              onClick={handleDiscard}
+              disabled={selectedHandCardIndex === null || playerHasDiscarded}
+              className={`flex-1 md:w-full py-2.5 md:py-3 px-4 font-black uppercase tracking-widest rounded border text-[9px] md:text-xs text-center transition-all ${
+                playerHasDiscarded
+                  ? 'bg-transparent text-gray-700 border-white/5 cursor-not-allowed'
+                  : selectedHandCardIndex !== null
+                    ? 'bg-red-950/60 text-red-300 border-red-800/60 hover:bg-red-900/60 cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.15)]'
+                    : 'bg-transparent text-gray-600 border-white/10 cursor-not-allowed'
+              }`}
+            >
+              {playerHasDiscarded ? '✓ Descartada' : 'Descartar'}
+            </motion.button>
+          )}
         </div>
       </footer>
 
@@ -589,6 +733,39 @@ const Game: React.FC<GameProps> = ({ user }) => {
               </span>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* INSTRUCCIÓN FLOTANTE JOKER 2 */}
+      <AnimatePresence>
+        {joker2Phase && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-80 pointer-events-none"
+          >
+            <div className="bg-purple-950/95 border border-purple-500/60 rounded-xl px-5 py-3 text-center shadow-[0_0_20px_rgba(168,85,247,0.3)] backdrop-blur-md">
+              <p className="text-purple-300 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em]">
+                ✦ Joker de Retorno ✦
+              </p>
+              <p className="text-white text-[9px] md:text-xs mt-1 font-medium">
+                {joker2Phase === 'board'
+                  ? 'Selecciona una carta de tu tablero'
+                  : 'Selecciona una carta de tu mano para intercambiar'}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ANIMACIÓN PHASER DE JOKER */}
+      <AnimatePresence>
+        {jokerAnim && (
+          <JokerAnimationOverlay
+            jokerCard={jokerAnim.card}
+            onComplete={handleJokerAnimComplete}
+          />
         )}
       </AnimatePresence>
 
@@ -663,12 +840,14 @@ const Game: React.FC<GameProps> = ({ user }) => {
 const GameCard: React.FC<{
   card: CardData;
   isSelected?: boolean;
+  isJoker2Swap?: boolean;
   onClick?: () => void;
   onRightClick?: (e: React.MouseEvent) => void;
   draggable?: boolean;
   onDragStart?: () => void;
   onDragEnd?: () => void;
-}> = ({ card, isSelected, onClick, onRightClick, draggable, onDragStart, onDragEnd }) => {
+}> = ({ card, isSelected, isJoker2Swap, onClick, onRightClick, draggable, onDragStart, onDragEnd }) => {
+  const isHighlighted = isSelected || isJoker2Swap;
   return (
     <motion.div
       layout
@@ -676,13 +855,13 @@ const GameCard: React.FC<{
       animate={{
         opacity: 1,
         y: 0,
-        scale: isSelected ? 1.1 : 1
+        scale: isHighlighted ? 1.1 : 1
       }}
-      whileHover={{ scale: isSelected ? 1.15 : 1.05 }}
+      whileHover={{ scale: isHighlighted ? 1.15 : 1.05 }}
       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
       className={`
         relative aspect-[2/3] w-12 sm:w-16 md:w-24 lg:w-28 cursor-pointer group shrink-0
-        ${isSelected ? 'z-50 -translate-y-4' : 'hover:z-40 hover:-translate-y-2'}
+        ${isHighlighted ? 'z-50 -translate-y-4' : 'hover:z-40 hover:-translate-y-2'}
       `}
       onClick={onClick}
       onContextMenu={onRightClick}
@@ -691,11 +870,11 @@ const GameCard: React.FC<{
       onDragEnd={onDragEnd}
     >
       <div
-        className={`w-full h-full relative rounded-md md:rounded-lg border-2 bg-[#080808] transition-all duration-500 
-          ${isSelected ? 'shadow-[0_0_30px_rgba(166,138,100,0.5)] card-holographic' : 'shadow-lg'}`}
+        className={`w-full h-full relative rounded-md md:rounded-lg border-2 bg-[#080808] transition-all duration-500
+          ${isJoker2Swap ? 'shadow-[0_0_30px_rgba(168,85,247,0.6)] animate-pulse' : isSelected ? 'shadow-[0_0_30px_rgba(166,138,100,0.5)] card-holographic' : 'shadow-lg'}`}
         style={{
-          borderColor: isSelected ? suitColors[card.suit] : `${suitColors[card.suit]}66`,
-          boxShadow: `0 0 15px ${suitColors[card.suit]}11`
+          borderColor: isJoker2Swap ? '#a855f7' : isSelected ? suitColors[card.suit] : `${suitColors[card.suit]}66`,
+          boxShadow: isJoker2Swap ? '0 0 20px rgba(168,85,247,0.4)' : `0 0 15px ${suitColors[card.suit]}11`
         }}
       >
         <div className="w-full h-full overflow-hidden relative rounded-[inherit]">
@@ -749,23 +928,30 @@ const BoardSlotView: React.FC<{
   hasAttacked?: boolean;
   isActiveToAttack?: boolean;
   isActiveToHeal?: boolean;
+  isActiveToStack?: boolean;
+  isJoker2Target?: boolean;
   onClick?: () => void;
-}> = ({ slot, isOpponent, onSelect, isActiveToPlay, isAttacking, hasAttacked, isActiveToAttack, isActiveToHeal, onClick }) => {
+  synergyGlow?: string | null;
+}> = ({ slot, isOpponent, onSelect, isActiveToPlay, isAttacking, hasAttacked, isActiveToAttack, isActiveToHeal, isActiveToStack, isJoker2Target, onClick, synergyGlow }) => {
   return (
     <div
       onClick={onClick}
       className={`
         flex-1 max-w-[70px] sm:max-w-[90px] md:max-w-[110px] lg:max-w-[120px] aspect-[2/3] rounded-lg border flex items-center justify-center relative transition-all duration-500
         ${slot.card
-          ? isAttacking
-            ? 'border-green-500 bg-green-500/10 shadow-[0_0_15px_rgba(34,197,94,0.4)] scale-105 z-30'
-            : hasAttacked
-              ? 'border-white/5 opacity-60'
-              : isActiveToAttack
-                ? 'border-red-500 bg-red-500/15 animate-pulse cursor-crosshair shadow-[0_0_20px_rgba(239,68,68,0.4)] z-30'
-                : isActiveToHeal
-                  ? 'border-green-500 bg-green-500/15 animate-pulse cursor-pointer shadow-[0_0_20px_rgba(34,197,94,0.4)] z-30'
-                  : 'border-white/5 bg-white/[0.01]'
+          ? isJoker2Target
+            ? 'border-purple-500 bg-purple-500/10 animate-pulse cursor-pointer shadow-[0_0_20px_rgba(168,85,247,0.5)] z-30'
+            : isAttacking
+              ? 'border-green-500 bg-green-500/10 shadow-[0_0_15px_rgba(34,197,94,0.4)] scale-105 z-30'
+              : hasAttacked
+                ? 'border-white/5 opacity-60'
+                : isActiveToAttack
+                  ? 'border-red-500 bg-red-500/15 animate-pulse cursor-crosshair shadow-[0_0_20px_rgba(239,68,68,0.4)] z-30'
+                  : isActiveToHeal
+                    ? 'border-green-500 bg-green-500/15 animate-pulse cursor-pointer shadow-[0_0_20px_rgba(34,197,94,0.4)] z-30'
+                    : isActiveToStack
+                      ? 'border-amber-500 bg-amber-500/10 animate-pulse cursor-pointer shadow-[0_0_20px_rgba(251,191,36,0.5)] z-30'
+                      : 'border-white/5 bg-white/[0.01]'
           : isActiveToPlay
             ? 'border-primary-gold bg-primary-gold/10 animate-pulse cursor-pointer shadow-lg'
             : 'border-white/5 bg-white/[0.01]'}
@@ -780,10 +966,18 @@ const BoardSlotView: React.FC<{
         >
           <div
             className={`w-full h-full relative rounded-md md:rounded-lg border-2 bg-[#080808] transition-all duration-500 group-hover:-translate-y-2 md:group-hover:-translate-y-4 group-hover:z-50`}
-            style={{
-              borderColor: isAttacking ? '#22c55e' : isActiveToAttack ? '#ef4444' : isActiveToHeal ? '#22c55e' : `${suitColors[slot.card.suit]}88`,
-              boxShadow: isAttacking ? '0 0 15px rgba(34,197,94,0.3)' : isActiveToAttack ? '0 0 15px rgba(239,68,68,0.3)' : isActiveToHeal ? '0 0 15px rgba(34,197,94,0.3)' : `0 0 15px ${suitColors[slot.card.suit]}11`
-            }}
+            style={(() => {
+              const synergyColor = synergyGlow ? suitColors[synergyGlow as keyof typeof suitColors] : null;
+              if (isJoker2Target) return { borderColor: '#a855f7', boxShadow: '0 0 18px rgba(168,85,247,0.5)' };
+              if (isAttacking) return { borderColor: '#22c55e', boxShadow: '0 0 15px rgba(34,197,94,0.3)' };
+              if (isActiveToAttack) return { borderColor: '#ef4444', boxShadow: '0 0 15px rgba(239,68,68,0.3)' };
+              if (isActiveToHeal) return { borderColor: '#22c55e', boxShadow: '0 0 15px rgba(34,197,94,0.3)' };
+              if (synergyColor) return {
+                borderColor: synergyColor,
+                boxShadow: `0 0 18px ${synergyColor}99, 0 0 40px ${synergyColor}44`,
+              };
+              return { borderColor: `${suitColors[slot.card.suit]}88`, boxShadow: `0 0 15px ${suitColors[slot.card.suit]}11` };
+            })()}
           >
             <div className="w-full h-full overflow-hidden relative rounded-[inherit]">
               <img src={slot.card.image} className="w-full h-full object-cover" />
@@ -802,7 +996,9 @@ const BoardSlotView: React.FC<{
                 {/* Info inferior: Nombre, Stats y Descripción */}
                 <div className="mt-auto text-center md:text-left">
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-[6px] md:text-[10px] text-white/70 uppercase">ATK: {slot.card.attack}</span>
+                    <span className="text-[6px] md:text-[10px] text-white/70 uppercase">
+                      ATK: {slot.card.ladderBonus ? `${slot.card.attack}+${slot.card.ladderBonus}` : slot.card.attack}
+                    </span>
                     <span className="text-[6px] md:text-[10px] text-white/70 uppercase">HP: {slot.card.health}</span>
                   </div>
                   <div className="border-t border-white/10 pt-1 md:pt-2">
@@ -814,7 +1010,9 @@ const BoardSlotView: React.FC<{
               </div>
 
               <div className="absolute bottom-0 left-0 right-0 p-1 md:p-2 bg-gradient-to-t from-black to-transparent flex justify-between items-center group-hover:opacity-0 transition-opacity">
-                <span className="text-red-500 font-bold text-[8px] md:text-xs">{slot.card.attack}</span>
+                <span className="text-red-500 font-bold text-[8px] md:text-xs">
+                  {slot.card.ladderBonus ? `${slot.card.attack}+${slot.card.ladderBonus}` : slot.card.attack}
+                </span>
                 <span className="text-blue-400 font-bold text-[8px] md:text-xs">{slot.card.health}</span>
               </div>
             </div>
@@ -831,8 +1029,15 @@ const BoardSlotView: React.FC<{
           </div>
 
           {slot.stack.length > 1 && (
-            <div className="absolute -bottom-1 -right-1 w-4 h-4 md:w-6 md:h-6 rounded bg-primary-gold text-black flex items-center justify-center font-black text-[8px] md:text-xs border border-black z-[60]">
-              +{slot.stack.length - 1}
+            <div className="group/ladder absolute -bottom-2 -left-2 z-50">
+              <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-amber-500/90 text-black flex items-center justify-center font-black text-[8px] md:text-[10px] border border-amber-300 shadow-[0_0_8px_rgba(251,191,36,0.8)] cursor-default select-none">
+                {slot.stack.length}
+              </div>
+              <div className="absolute bottom-full left-0 mb-1 hidden group-hover/ladder:block pointer-events-none">
+                <div className="bg-black/90 border border-amber-500/50 rounded px-2 py-1 text-[8px] md:text-[9px] text-amber-400 font-bold uppercase tracking-wide whitespace-nowrap">
+                  Escalera de {slot.stack.length}: +{slot.stack.length - 1} ATK extra
+                </div>
+              </div>
             </div>
           )}
 
@@ -867,3 +1072,36 @@ const BoardSlotView: React.FC<{
 };
 
 export default Game;
+
+const suitBonusText: Record<string, string> = {
+  oros: 'Bonus de Oros: +1 de voluntad por turno',
+  copas: 'Bonus de Copas: +1 HP por turno y purga efectos negativos',
+  espadas: 'Bonus de Espadas: +1 de daño a todas las cartas',
+  bastos: 'Bonus de Bastos: -1 de daño recibido a todas las cartas',
+};
+
+const SynergyBadge: React.FC<{ suit: string; isOpponent?: boolean }> = ({ suit, isOpponent }) => {
+  const color = suitColors[suit as keyof typeof suitColors] ?? '#ffffff';
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: isOpponent ? -8 : 8, scale: 0.85 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: isOpponent ? -8 : 8, scale: 0.85 }}
+      transition={{ duration: 0.3 }}
+      className={`absolute ${isOpponent ? '-top-7' : '-bottom-7'} right-0 z-40 pointer-events-none`}
+    >
+      <div
+        className="flex items-center gap-1 px-2 py-1 rounded-full text-[8px] md:text-[9px] font-bold uppercase tracking-wider border backdrop-blur-md whitespace-nowrap"
+        style={{
+          color,
+          borderColor: `${color}55`,
+          backgroundColor: `${color}18`,
+          boxShadow: `0 0 10px ${color}40`,
+        }}
+      >
+        <span style={{ color }}>✦</span>
+        <span>{suitBonusText[suit] ?? suit}</span>
+      </div>
+    </motion.div>
+  );
+};
