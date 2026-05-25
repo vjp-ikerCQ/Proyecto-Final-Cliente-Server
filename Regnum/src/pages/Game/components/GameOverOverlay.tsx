@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { motion, type Variants } from 'framer-motion';
-import { Crown, Skull, RotateCcw, Home, Trophy, Swords, Flame, Sparkles } from 'lucide-react';
+import { Crown, Skull, RotateCcw, Home, Trophy, Flame } from 'lucide-react';
 
 interface GameOverOverlayProps {
   result: 'victory' | 'defeat';

@@ -8,6 +8,7 @@ import { useBotAI } from './hooks/useBotAI';
 import AtmosphereParticles from '../../components/AtmosphereParticles';
 import { updateMatchStats } from '../../services/userService';
 import { GameOverOverlay } from './components/GameOverOverlay';
+import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
 
 const MAX_HP = 30;
 
@@ -29,11 +30,6 @@ interface GameProps {
 const Game: React.FC<GameProps> = ({ user }) => {
   const navigate = useNavigate();
   const { playSfx, playMusic, stopMusic } = useSettings();
-
-  const handleSelectCard = (card: CardData) => {
-    playSfx();
-    setViewingCard(card);
-  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -105,7 +101,6 @@ const Game: React.FC<GameProps> = ({ user }) => {
   const [selectedAttackerIndex, setSelectedAttackerIndex] = useState<number | null>(null);
   const [viewingCard, setViewingCard] = useState<CardData | null>(null);
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
-  const [isSurrendering, setIsSurrendering] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
   const [warningText, setWarningText] = useState<string | null>(null);
   const [draggingHandIndex, setDraggingHandIndex] = useState<number | null>(null);
@@ -429,7 +424,6 @@ const Game: React.FC<GameProps> = ({ user }) => {
             <BoardSlotView
               key={`opp-${i}`}
               slot={slot}
-              isOpponent
               onSelect={setViewingCard}
               isActiveToAttack={isOpponentSlotActiveToAttack(i) && slot.card !== null}
               onClick={() => handleOpponentSlotClick(i)}
@@ -800,7 +794,6 @@ const GameCard: React.FC<{
 
 const BoardSlotView: React.FC<{
   slot: BoardSlot;
-  isOpponent?: boolean;
   onSelect: (c: CardData) => void;
   isActiveToPlay?: boolean;
   isAttacking?: boolean;
@@ -808,7 +801,7 @@ const BoardSlotView: React.FC<{
   isActiveToAttack?: boolean;
   isActiveToHeal?: boolean;
   onClick?: () => void;
-}> = ({ slot, isOpponent, onSelect, isActiveToPlay, isAttacking, hasAttacked, isActiveToAttack, isActiveToHeal, onClick }) => {
+}> = ({ slot, onSelect, isActiveToPlay, isAttacking, hasAttacked, isActiveToAttack, isActiveToHeal, onClick }) => {
   return (
     <div
       onClick={onClick}
