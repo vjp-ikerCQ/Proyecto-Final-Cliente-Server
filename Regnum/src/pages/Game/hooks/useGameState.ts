@@ -66,6 +66,24 @@ export const useGameState = () => {
 
   // Inicializar mazo
   const initializeGame = async () => {
+    // Resetear estados del juego
+    setVoluntad(10);
+    setHp(30);
+    setBoard([
+      { card: null, stack: [] },
+      { card: null, stack: [] },
+      { card: null, stack: [] }
+    ]);
+    setOpponentHp(30);
+    setOpponentVoluntad(10);
+    setPlayerAttackedIndices([]);
+    setOpponentAttackedIndices([]);
+    setPlayerMagoAttacks({});
+    setOpponentMagoAttacks({});
+    setPlayerHasDiscarded(false);
+    setDiscardPile([]);
+    setIsPlayerTurn(true);
+
     try {
       const sharedShuffledDeck = await fetchShuffledDeck();
 

@@ -9,7 +9,9 @@ import { useSuitSynergy } from './hooks/useSuitSynergy';
 import AtmosphereParticles from '../../components/AtmosphereParticles';
 import { updateMatchStats } from '../../services/userService';
 import { GameOverOverlay } from './components/GameOverOverlay';
-import { JokerAnimationOverlay } from './components/JokerAnimationOverlay';
+import { useChat } from './hooks/useChat';
+import { ChatOverlay } from './components/ChatOverlay';
+import { AttackAnimationOverlay } from './components/AttackAnimationOverlay';
 
 const MAX_HP = 30;
 
@@ -45,11 +47,11 @@ const Game: React.FC<GameProps> = ({ user }) => {
     deck,
     isPlayerTurn,
     isLoading,
+    initializeGame,
     drawCard,
     playCard,
     useJoker,
     endTurn,
-    healCard,
     setOpponentHand,
     setDeck,
     setOpponentVoluntad,
@@ -68,29 +70,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
     opponentBoard,
   });
 
-  useBotAI({
-    isPlayerTurn,
-    isLoading,
-    opponentVoluntad,
-    opponentHand,
-    opponentBoard,
-    deck,
-    setOpponentHand,
-    setDeck,
-    setOpponentVoluntad,
-    setOpponentBoard,
-    endTurn,
-    board,
-    hp,
-    attackCard: gameState.attackCard,
-    attackDirectly: gameState.attackDirectly,
-    healCard: gameState.healCard,
-    useJoker: gameState.useJoker,
-    playCard: gameState.playCard,
-    drawCard: gameState.drawCard,
-    opponentAttackedIndices: gameState.opponentAttackedIndices,
-    opponentMagoAttacks: gameState.opponentMagoAttacks
-  });
+
 
   // Gestión de selección local de la UI
   const [selectedHandCardIndex, setSelectedHandCardIndex] = useState<number | null>(null);
@@ -110,6 +90,114 @@ const Game: React.FC<GameProps> = ({ user }) => {
   //              'hand'  = esperando que elija carta de la mano para intercambiar
   const [joker2Phase, setJoker2Phase] = useState<'board' | 'hand' | null>(null);
   const [joker2BoardSlot, setJoker2BoardSlot] = useState<number | null>(null);
+
+  // --- Sistema de Animaciones de Combate (PhaserJS) ---
+  interface AttackAnimState {
+    attackerCard: CardData;
+    targetCard?: CardData | null;
+    isDirect: boolean;
+    isHeal: boolean;
+    isPlayerAttacker: boolean;
+    attackerSlotIndex: number;
+    targetSlotIndex?: number;
+    onComplete: () => void;
+  }
+
+  const [activeAttackAnim, setActiveAttackAnim] = useState<AttackAnimState | null>(null);
+
+  const playAttackAnimation = (
+    isPlayer: boolean,
+    attackerSlotIndex: number,
+    targetSlotIndex: number | undefined,
+    isDirect: boolean,
+    isHeal: boolean,
+    executeAction: () => void
+  ) => {
+    const attackerBoard = isPlayer ? board : opponentBoard;
+    const defenderBoard = isPlayer ? opponentBoard : board;
+    const attackerCard = attackerBoard[attackerSlotIndex]?.card;
+    
+    if (!attackerCard) {
+      executeAction();
+      return;
+    }
+
+    let targetCard: CardData | null = null;
+    if (!isDirect && targetSlotIndex !== undefined) {
+      targetCard = (isHeal ? attackerBoard : defenderBoard)[targetSlotIndex]?.card || null;
+    }
+
+    setActiveAttackAnim({
+      attackerCard,
+      targetCard,
+      isDirect,
+      isHeal,
+      isPlayerAttacker: isPlayer,
+      attackerSlotIndex,
+      targetSlotIndex,
+      onComplete: () => {
+        setActiveAttackAnim(null);
+        executeAction();
+      }
+    });
+  };
+
+  const wrappedAttackCard = (isPlayer: boolean, attackerSlotIndex: number, targetSlotIndex: number) => {
+    playAttackAnimation(isPlayer, attackerSlotIndex, targetSlotIndex, false, false, () => {
+      gameState.attackCard(isPlayer, attackerSlotIndex, targetSlotIndex);
+    });
+  };
+
+  const wrappedAttackDirectly = (isPlayer: boolean, attackerSlotIndex: number) => {
+    playAttackAnimation(isPlayer, attackerSlotIndex, undefined, true, false, () => {
+      gameState.attackDirectly(isPlayer, attackerSlotIndex);
+    });
+  };
+
+  const wrappedHealCard = (isPlayer: boolean, healerSlotIndex: number, targetSlotIndex: number) => {
+    playAttackAnimation(isPlayer, healerSlotIndex, targetSlotIndex, false, true, () => {
+      gameState.healCard(isPlayer, healerSlotIndex, targetSlotIndex);
+    });
+  };
+
+  useBotAI({
+    isPlayerTurn,
+    isLoading,
+    opponentVoluntad,
+    opponentHand,
+    opponentBoard,
+    deck,
+    setOpponentHand,
+    setDeck,
+    setOpponentVoluntad,
+    setOpponentBoard,
+    endTurn,
+    board,
+    hp,
+    attackCard: wrappedAttackCard,
+    attackDirectly: wrappedAttackDirectly,
+    healCard: wrappedHealCard,
+    useJoker: gameState.useJoker,
+    playCard: gameState.playCard,
+    drawCard: gameState.drawCard,
+    opponentAttackedIndices: gameState.opponentAttackedIndices,
+    opponentMagoAttacks: gameState.opponentMagoAttacks
+  });
+  const { messages, visible, input, setInput, sendMessage, toggleChat } = useChat();
+
+useEffect(() => {
+  const handler = (e: KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      const active = document.activeElement as HTMLElement;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+        return;
+      }
+      toggleChat();
+    }
+  };
+  document.addEventListener('keydown', handler);
+  return () => document.removeEventListener('keydown', handler);
+}, [toggleChat]);
 
   useEffect(() => {
     if (voluntad < 5) {
@@ -199,7 +287,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
             setWarningText('Voluntad insuficiente');
             return;
           }
-          healCard(true, selectedAttackerIndex, slotIndex);
+          wrappedHealCard(true, selectedAttackerIndex, slotIndex);
           setSelectedAttackerIndex(null);
           return;
         }
@@ -219,7 +307,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
         const isMago = attackerCard?.role.toUpperCase() === 'MAGO';
         const magoAttacksCount = (playerMagoAttacks[selectedAttackerIndex] || []).length;
         
-        gameState.attackCard(true, selectedAttackerIndex, slotIndex);
+        wrappedAttackCard(true, selectedAttackerIndex, slotIndex);
         
         // Deseleccionar al atacante si no es un Mago, o si ya ha realizado su segundo ataque
         if (!isMago || magoAttacksCount >= 1) {
@@ -237,6 +325,18 @@ const Game: React.FC<GameProps> = ({ user }) => {
         setViewingCard(slot.card);
       }
     }
+  };
+
+  const handleRestart = () => {
+    setSelectedHandCardIndex(null);
+    setSelectedAttackerIndex(null);
+    setViewingCard(null);
+    setGameOver(null);
+    statsUpdated.current = false;
+    setJokerAnim(null);
+    setJoker2Phase(null);
+    setJoker2BoardSlot(null);
+    initializeGame();
   };
 
   const handleAttackDirectly = () => {
@@ -261,7 +361,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
       return;
     }
 
-    gameState.attackDirectly(true, selectedAttackerIndex);
+    wrappedAttackDirectly(true, selectedAttackerIndex);
 
     // Deseleccionar al atacante si no es un Mago, o si ya ha realizado su segundo ataque
     if (!isMago || magoAttacksCount >= 1) {
@@ -472,11 +572,13 @@ const Game: React.FC<GameProps> = ({ user }) => {
             <span className="uppercase tracking-widest text-[7px] md:text-[9px]">Rendirse</span>
           </button>
           <div className="text-lg font-black text-gold-gradient tracking-widest uppercase sm:hidden">REGNUM</div>
-          <div className="w-6 sm:hidden" />
+
+
         </div>
 
         <div className="flex justify-around items-center w-full max-w-2xl gap-4 md:gap-12">
           <div
+            id="opponent-face"
             onClick={selectedAttackerIndex !== null ? handleAttackDirectly : undefined}
             className={`flex flex-col items-center flex-1 transition-all duration-300 ${canAttackDirectly() ? 'cursor-crosshair scale-105 border border-red-500/40 p-1 bg-red-950/20 rounded shadow-[0_0_15px_rgba(220,38,38,0.2)] animate-pulse' : ''}`}
           >
@@ -488,7 +590,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
             <span className="text-[6px] md:text-[8px] text-red-400 mt-1">Voluntad: {opponentVoluntad} / Mano: {opponentHand.length}</span>
           </div>
           <div className="text-xl font-black text-gold-gradient tracking-widest uppercase hidden md:block">REGNUM HOLLOW</div>
-          <div className="flex flex-col items-center flex-1">
+          <div id="player-face" className="flex flex-col items-center flex-1">
             <span className={`text-[7px] md:text-[9px] ${isPlayerTurn ? 'text-blue-400' : 'text-blue-400/50'} uppercase tracking-[0.2em] mb-0.5`}>
               Jugador {isPlayerTurn && '(Tu Turno)'}
             </span>
@@ -521,6 +623,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
           {opponentBoard.map((slot, i) => (
             <BoardSlotView
               key={`opp-${i}`}
+              id={`opponent-board-slot-${i}`}
               slot={slot}
               isOpponent
               onSelect={setViewingCard}
@@ -547,6 +650,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
           {board.map((slot, i) => (
             <BoardSlotView
               key={`player-${i}`}
+              id={`player-board-slot-${i}`}
               slot={slot}
               onSelect={setViewingCard}
               isAttacking={selectedAttackerIndex === i}
@@ -684,7 +788,15 @@ const Game: React.FC<GameProps> = ({ user }) => {
         </div>
       </footer>
 
-      {/* OVERLAY DE DETALLES */}
+        {/* CHAT OVERLAY */}
+        <ChatOverlay
+          messages={messages}
+          visible={visible}
+          input={input}
+          setInput={setInput}
+          sendMessage={sendMessage}
+          toggleChat={toggleChat}
+        />
       <AnimatePresence>
         {viewingCard && (
           <motion.div
@@ -769,16 +881,29 @@ const Game: React.FC<GameProps> = ({ user }) => {
         )}
       </AnimatePresence>
 
+      {/* ANIMACIÓN PHASER DE ATAQUE */}
+      <AnimatePresence>
+        {activeAttackAnim && (
+          <AttackAnimationOverlay
+            attackerCard={activeAttackAnim.attackerCard}
+            targetCard={activeAttackAnim.targetCard}
+            isDirect={activeAttackAnim.isDirect}
+            isHeal={activeAttackAnim.isHeal}
+            isPlayerAttacker={activeAttackAnim.isPlayerAttacker}
+            attackerSlotIndex={activeAttackAnim.attackerSlotIndex}
+            targetSlotIndex={activeAttackAnim.targetSlotIndex}
+            onComplete={activeAttackAnim.onComplete}
+          />
+        )}
+      </AnimatePresence>
+
       {/* MODAL FIN DE PARTIDA: VICTORIA / DERROTA */}
       <AnimatePresence>
         {gameOver && (
           <GameOverOverlay
             result={gameOver}
             userName={user.name || 'Héroe'}
-            onRestart={() => {
-              navigate('/game');
-              window.location.reload();
-            }}
+            onRestart={handleRestart}
             onMainMenu={() => navigate('/menu')}
           />
         )}
@@ -921,6 +1046,7 @@ const GameCard: React.FC<{
 
 const BoardSlotView: React.FC<{
   slot: BoardSlot;
+  id?: string;
   isOpponent?: boolean;
   onSelect: (c: CardData) => void;
   isActiveToPlay?: boolean;
@@ -932,9 +1058,10 @@ const BoardSlotView: React.FC<{
   isJoker2Target?: boolean;
   onClick?: () => void;
   synergyGlow?: string | null;
-}> = ({ slot, isOpponent, onSelect, isActiveToPlay, isAttacking, hasAttacked, isActiveToAttack, isActiveToHeal, isActiveToStack, isJoker2Target, onClick, synergyGlow }) => {
+}> = ({ slot, id, isOpponent: _isOpponent, onSelect, isActiveToPlay, isAttacking, hasAttacked, isActiveToAttack, isActiveToHeal, isActiveToStack, isJoker2Target, onClick, synergyGlow }) => {
   return (
     <div
+      id={id}
       onClick={onClick}
       className={`
         flex-1 max-w-[70px] sm:max-w-[90px] md:max-w-[110px] lg:max-w-[120px] aspect-[2/3] rounded-lg border flex items-center justify-center relative transition-all duration-500

@@ -33,10 +33,10 @@ export const useBotAI = ({
   opponentHand,
   opponentBoard,
   deck,
-  setOpponentHand,
-  setDeck,
-  setOpponentVoluntad,
-  setOpponentBoard,
+  setOpponentHand: _setOpponentHand,
+  setDeck: _setDeck,
+  setOpponentVoluntad: _setOpponentVoluntad,
+  setOpponentBoard: _setOpponentBoard,
   endTurn,
   board,
   hp,
@@ -220,4 +220,15 @@ export const useBotAI = ({
     attackDirectly,
     endTurn
   ]);
+};
+
+export const generateMockBotReply = (playerMessage: string): string => {
+  const replies = [
+    "¡Vaya, eso fue más útil que una cuchara de oro!",
+    "¿De verdad piensas que eso funciona? 😂",
+    "¡Ja! Ni siquiera la sombra de tu estrategia sirve.",
+    "¿Otra jugada? Mejor guarda la dignidad.",
+    "¡Esa frase suena como un hechizo fallido!",
+  ];
+  return replies[Math.floor(Math.random() * replies.length)];
 };
