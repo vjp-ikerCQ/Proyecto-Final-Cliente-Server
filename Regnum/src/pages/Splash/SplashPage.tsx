@@ -1,12 +1,21 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { audioService } from '../../services/AudioService';
+import { useSettings } from '../../contexts/SettingsContext';
 
 
 const SplashPage: React.FC = () => {
   const navigate = useNavigate();
-  const { playMusic, playSfx } = useSettings();
+  const { playMusic } = useSettings();
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // Play splash2 music from Cloudinary
+      playMusic('https://res.cloudinary.com/drvgncidb/video/upload/v1778854628/Assets/Folders/Home/regnumhollow/background/splash2.mp3');
+    }, 250); // 0.25 seconds delay
+
+    return () => clearTimeout(timer);
+  }, [playMusic]);
 
   const handleStart = () => {
     playMusic('/audio/menu.mp3');

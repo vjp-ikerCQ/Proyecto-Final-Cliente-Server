@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { motion, type Variants } from 'framer-motion';
 import { Crown, Skull, RotateCcw, Home, Trophy, Flame } from 'lucide-react';
+import { useSettings } from '../../../contexts/SettingsContext';
 
 interface GameOverOverlayProps {
   result: 'victory' | 'defeat';
@@ -55,6 +56,34 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
   onMainMenu,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { playMusic, playSfx } = useSettings();
+  const audioPlayedRef = useRef(false);
+
+  useEffect(() => {
+    let sfxTimer: any;
+    if (!audioPlayedRef.current) {
+      audioPlayedRef.current = true;
+
+      if (result === 'victory') {
+        playMusic('https://res.cloudinary.com/drvgncidb/video/upload/v1778854628/Assets/Folders/Home/regnumhollow/background/winning-loop.mp3');
+      } else if (result === 'defeat') {
+        playMusic('https://res.cloudinary.com/drvgncidb/video/upload/v1778854628/Assets/Folders/Home/regnumhollow/background/mixkit-circus-lose.wav');
+
+        const defeatVoices = [
+          'https://res.cloudinary.com/drvgncidb/video/upload/v1779449564/game_over_dmpjla.ogg',
+          'https://res.cloudinary.com/drvgncidb/video/upload/v1779449555/loser_qlvvhy.ogg',
+          'https://res.cloudinary.com/drvgncidb/video/upload/v1779449521/you_lose_micfug.ogg'
+        ];
+        const randomVoiceUrl = defeatVoices[Math.floor(Math.random() * defeatVoices.length)];
+        sfxTimer = setTimeout(() => {
+          playSfx(randomVoiceUrl);
+        }, 100);
+      }
+    }
+    return () => {
+      if (sfxTimer) clearTimeout(sfxTimer);
+    };
+  }, [result, playMusic, playSfx]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
