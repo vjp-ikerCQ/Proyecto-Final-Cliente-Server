@@ -29,6 +29,51 @@ interface BotAIOptions {
   opponentMagoAttacks: Record<number, number[]>;
 }
 
+export const evaluateTargetScore = (attackerCard: CardData, targetCard: CardData | null): number => {
+  let score = 0;
+
+  if (!targetCard) {
+    // Ataque directo a la cara del jugador
+    return 10;
+  }
+
+  const role = targetCard.role.toUpperCase();
+  
+  // Puntuación base por nivel de amenaza
+  if (['REY', 'AS', 'TIRADOR', 'MAGO', 'ASESINO', 'CABALLO'].includes(role)) {
+    score += 30;
+  } else if (['CLERIGO', 'CURANDERO'].includes(role)) {
+    score += 15;
+  } else {
+    score += 5; // Amenaza baja
+  }
+
+  // Cálculo aproximado del daño
+  let damageNum = 0;
+  const isHalf = attackerCard.effect === 'half' || attackerCard.attack === '1/2';
+  if (isHalf) {
+    damageNum = Math.floor(targetCard.health / 2);
+  } else if (typeof attackerCard.attack === 'number') {
+    damageNum = attackerCard.attack;
+  } else if (typeof attackerCard.attack === 'string') {
+    damageNum = parseInt(attackerCard.attack, 10) || 0;
+  }
+  damageNum += attackerCard.ladderBonus || 0;
+  if (attackerCard.suit === 'espadas' && !isHalf) damageNum += 1;
+  
+  let effectiveDamage = damageNum;
+  if (targetCard.shield) effectiveDamage = Math.max(0, effectiveDamage - 1);
+  if ((targetCard.bleedTurns ?? 0) > 0) effectiveDamage += 1;
+
+  if (effectiveDamage >= targetCard.health) {
+    score += 50; // Bonus letal! Limpiar cartas es prioritario.
+  } else {
+    score += effectiveDamage; // Si no lo mata, priorizamos hacer el mayor daño posible.
+  }
+
+  return score;
+};
+
 export const useBotAI = ({
   isPlayerTurn,
   isLoading,
@@ -71,11 +116,32 @@ export const useBotAI = ({
     const timer = setTimeout(() => {
       let actionTaken = false;
 
-      // 1. Usar Jokers
-      const jokerIndex = opponentHand.findIndex(c => c.suit === 'jokers');
-      if (jokerIndex !== -1 && opponentVoluntad >= 1) {
-        useJoker(false, jokerIndex);
-        actionTaken = true;
+      // 0. Ahorro de Voluntad
+      let savingWillpower = false;
+      for (let i = 0; i < 3; i++) {
+        const slot = opponentBoard[i];
+        if (!slot.card) continue;
+        if (opponentAttackedIndices.includes(i)) continue;
+        
+        const card = slot.card;
+        const isMago = card.role.toUpperCase() === 'MAGO';
+        const magoAttacks = opponentMagoAttacks[i] || [];
+        const hasAttackedOnce = isMago && magoAttacks.length > 0;
+        
+        // Si no ha atacado y no tenemos voluntad para pagar su ataque, queremos ahorrar
+        if (!hasAttackedOnce && opponentVoluntad < card.cost) {
+          savingWillpower = true;
+          break;
+        }
+      }
+
+      // 1. Usar Jokers (Saltar si estamos ahorrando voluntad)
+      if (!savingWillpower) {
+        const jokerIndex = opponentHand.findIndex(c => c.suit === 'jokers');
+        if (jokerIndex !== -1 && opponentVoluntad >= 1) {
+          useJoker(false, jokerIndex);
+          actionTaken = true;
+        }
       }
 
       // 2. Bajar Cartas (slots vacíos primero)
@@ -93,6 +159,7 @@ export const useBotAI = ({
       }
 
       // 2b. Escaleras: apilar carta si el rango siguiente está en la mano
+      // Se permite hacer escaleras incluso ahorrando voluntad porque son gratis.
       if (!actionTaken) {
         for (let i = 0; i < 3; i++) {
           const topCard = opponentBoard[i].card;
@@ -124,24 +191,37 @@ export const useBotAI = ({
           if (!hasAttackedOnce && opponentVoluntad < card.cost) continue;
 
           if (card.role === 'CURANDERO') {
-            let targetToHeal = -1;
-            for (let j = 0; j < 3; j++) {
-              if (i !== j && opponentBoard[j].card) {
-                const ally = opponentBoard[j].card!;
-                // Cura si tiene menos de 5 de vida o si es la única carta
-                if (ally.health <= 5) {
-                  targetToHeal = j;
-                  break;
-                }
-              }
-            }
-            if (targetToHeal !== -1) {
-              healCard(false, i, targetToHeal);
-              actionTaken = true;
-              break;
-            } else {
-              continue; // Curandero no ataca
-            }
+             // Curación inteligente
+             let bestTarget = -1;
+             let maxScore = -1;
+             for (let j = 0; j < 3; j++) {
+               if (i !== j && opponentBoard[j].card) {
+                 const ally = opponentBoard[j].card!;
+                 const maxHp = ally.maxHealth ?? 5; // Valor seguro por defecto
+                 if (ally.health < maxHp) {
+                   let allyScore = 0;
+                   const role = ally.role.toUpperCase();
+                   if (['REY', 'AS', 'TIRADOR', 'MAGO', 'ASESINO', 'CABALLO'].includes(role)) allyScore += 30;
+                   else if (['CLERIGO', 'CURANDERO'].includes(role)) allyScore += 15;
+                   else allyScore += 5;
+                   
+                   // Prioridad a cartas cerca de la muerte
+                   if (ally.health <= 3) allyScore += 20;
+
+                   if (allyScore > maxScore) {
+                     maxScore = allyScore;
+                     bestTarget = j;
+                   }
+                 }
+               }
+             }
+             if (bestTarget !== -1) {
+               healCard(false, i, bestTarget);
+               actionTaken = true;
+               break;
+             } else {
+               continue; // Curandero no ataca
+             }
           }
 
           if (card.attackType !== 'SOPORTE') {
@@ -178,12 +258,33 @@ export const useBotAI = ({
               else if (board[i].card) validTargets.push(i);
             }
 
-            if (validTargets.length > 0) {
-              attackCard(false, i, validTargets[0]);
-              actionTaken = true;
-              break;
-            } else if (canAttackDir) {
-              attackDirectly(false, i);
+            // Target evaluation
+            let bestTarget = -1;
+            let maxScore = -1;
+
+            for (const targetIdx of validTargets) {
+               const targetCard = board[targetIdx].card!;
+               const score = evaluateTargetScore(card, targetCard);
+               if (score > maxScore) {
+                 maxScore = score;
+                 bestTarget = targetIdx;
+               }
+            }
+
+            if (canAttackDir) {
+               const dirScore = evaluateTargetScore(card, null);
+               if (dirScore > maxScore) {
+                 bestTarget = -1; // -1 significa ataque directo al jugador
+                 maxScore = dirScore;
+               }
+            }
+
+            if (bestTarget !== -1 && maxScore > -1) {
+              if (bestTarget === -1) {
+                attackDirectly(false, i);
+              } else {
+                attackCard(false, i, bestTarget);
+              }
               actionTaken = true;
               break;
             }
@@ -203,8 +304,8 @@ export const useBotAI = ({
         }
       }
 
-      // 4. Robar cartas
-      if (!actionTaken && opponentVoluntad >= 1 && opponentHand.length < 5 && (deck.length > 0 || discardPile.length > 0)) {
+      // 4. Robar cartas (Solo si NO estamos ahorrando voluntad)
+      if (!actionTaken && !savingWillpower && opponentVoluntad >= 1 && opponentHand.length < 5 && (deck.length > 0 || discardPile.length > 0)) {
         drawCard(false);
         actionTaken = true;
       }
