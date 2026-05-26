@@ -67,6 +67,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
     joker1Swap,
     joker3Resurrect,
     joker2Swap,
+    moveCaballo,
   } = gameState;
 
   const { playerSynergy, opponentSynergy } = useSuitSynergy({
@@ -87,6 +88,12 @@ const Game: React.FC<GameProps> = ({ user }) => {
   const [isDragOverDiscard, setIsDragOverDiscard] = useState(false);
   const [gameOver, setGameOver] = useState<'victory' | 'defeat' | null>(null);
   const statsUpdated = useRef(false);
+
+  // Estado del popup y movimiento del Caballo
+  const [caballoPopupSlot, setCaballoPopupSlot] = useState<number | null>(null);
+  const [caballoMoveSourceSlot, setCaballoMoveSourceSlot] = useState<number | null>(null);
+  // IDs de Caballos que ya se movieron este turno (se resetea en handleEndTurn)
+  const [caballoMovedIds, setCaballoMovedIds] = useState<string[]>([]);
 
   // Estado de animación y flujo de Jokers 2 y 3
   const [jokerAnim, setJokerAnim] = useState<{ card: CardData; rank: number } | null>(null);
@@ -245,6 +252,14 @@ useEffect(() => {
 
   // Manejadores específicos de la UI del jugador
   const handleDrawCard = () => {
+    if (voluntad < 1) {
+      setWarningText('Voluntad insuficiente para robar carta');
+      return;
+    }
+    if (hand.length >= 5) {
+      setWarningText('La mano está llena');
+      return;
+    }
     drawCard(true);
   };
 
@@ -256,6 +271,17 @@ useEffect(() => {
 
   const handlePlayerSlotClick = (slotIndex: number) => {
     const slot = board[slotIndex];
+
+    // ── Fase de movimiento del Caballo ──
+    if (caballoMoveSourceSlot !== null) {
+      if (Math.abs(slotIndex - caballoMoveSourceSlot) === 1) {
+        const movingCard = board[caballoMoveSourceSlot]?.card;
+        if (movingCard) setCaballoMovedIds(prev => [...prev, movingCard.id]);
+        moveCaballo(caballoMoveSourceSlot, slotIndex);
+      }
+      setCaballoMoveSourceSlot(null);
+      return;
+    }
 
     // ── Joker 2: fase de selección de slot del tablero ──
     if (joker2Phase === 'board') {
@@ -311,6 +337,15 @@ useEffect(() => {
       }
 
       if (!isPlayerTurn) return;
+
+      // Caballo: mostrar popup de acción en vez de seleccionar directamente
+      if (slot.card && slot.card.role.toUpperCase() === 'CABALLO') {
+        setCaballoPopupSlot(prev => prev === slotIndex ? null : slotIndex);
+        setSelectedAttackerIndex(null);
+        setSelectedHandCardIndex(null);
+        return;
+      }
+
       if (gameState.playerAttackedIndices.includes(slotIndex)) return; // ya atacó
       setSelectedAttackerIndex(prev => prev === slotIndex ? null : slotIndex);
       setSelectedHandCardIndex(null);
@@ -356,6 +391,9 @@ useEffect(() => {
     setJoker1Phase(null);
     setJoker1PlayerSelections([]);
     setJoker1OpponentSelections([]);
+    setCaballoPopupSlot(null);
+    setCaballoMoveSourceSlot(null);
+    setCaballoMovedIds([]);
     initializeGame();
   };
 
@@ -465,6 +503,9 @@ useEffect(() => {
     setJoker1Phase(null);
     setJoker1PlayerSelections([]);
     setJoker1OpponentSelections([]);
+    setCaballoPopupSlot(null);
+    setCaballoMoveSourceSlot(null);
+    setCaballoMovedIds([]);
   };
 
   const handleOpponentHandCardClick = (i: number) => {
@@ -653,9 +694,12 @@ useEffect(() => {
             onClick={selectedAttackerIndex !== null ? handleAttackDirectly : undefined}
             className={`flex flex-col items-center flex-1 transition-all duration-300 ${canAttackDirectly() ? 'cursor-crosshair scale-105 border border-red-500/40 p-1 bg-red-950/20 rounded shadow-[0_0_15px_rgba(220,38,38,0.2)] animate-pulse' : ''}`}
           >
-            <span className="text-[7px] md:text-[9px] text-red-500/80 uppercase tracking-[0.2em] mb-0.5">Oponente {!isPlayerTurn && '(Pensando...)'} {selectedAttackerIndex !== null && '🎯 ATACAR'}</span>
-            <div className="w-full max-w-[120px] md:max-w-[180px] h-1.5 bg-red-950/30 rounded-full border border-red-900/20 relative overflow-hidden">
-              <motion.div className="absolute inset-0 bg-red-600 shadow-[0_0_8px_red]" animate={{ width: `${(opponentHp / MAX_HP) * 100}%` }} />
+            <span className="text-[7px] md:text-[9px] text-red-500/80 uppercase tracking-[0.2em] mb-0.5">La Sombra {!isPlayerTurn && '(Pensando...)'} {selectedAttackerIndex !== null && '🎯 ATACAR'}</span>
+            <div className="flex items-center gap-1.5 w-full max-w-[120px] md:max-w-[220px]">
+              <div className="flex-1 h-1.5 bg-red-950/30 rounded-full border border-red-900/20 relative overflow-hidden">
+                <motion.div className="absolute inset-0 bg-red-600 shadow-[0_0_8px_red]" animate={{ width: `${(opponentHp / MAX_HP) * 100}%` }} />
+              </div>
+              <span className="text-[7px] md:text-[9px] font-bold text-red-400 whitespace-nowrap">{opponentHp}/{MAX_HP} PV</span>
             </div>
             {/* Opcional: mostrar voluntad del oponente (útil para debug o gameplay) */}
             <span className="text-[6px] md:text-[8px] text-red-400 mt-1">Voluntad: {opponentVoluntad} / Mano: {opponentHand.length}</span>
@@ -663,10 +707,13 @@ useEffect(() => {
           <div className="text-xl font-black text-gold-gradient tracking-widest uppercase hidden md:block">REGNUM HOLLOW</div>
           <div id="player-face" className="flex flex-col items-center flex-1">
             <span className={`text-[7px] md:text-[9px] ${isPlayerTurn ? 'text-blue-400' : 'text-blue-400/50'} uppercase tracking-[0.2em] mb-0.5`}>
-              Jugador {isPlayerTurn && '(Tu Turno)'}
+              {user.name || 'Jugador'} {isPlayerTurn && '(Tu Turno)'}
             </span>
-            <div className="w-full max-w-[120px] md:max-w-[180px] h-1.5 bg-blue-950/30 rounded-full border border-blue-900/20 relative overflow-hidden">
-              <motion.div className="absolute inset-0 bg-blue-500 shadow-[0_0_8px_blue]" animate={{ width: `${(hp / MAX_HP) * 100}%` }} />
+            <div className="flex items-center gap-1.5 w-full max-w-[120px] md:max-w-[220px]">
+              <div className="flex-1 h-1.5 bg-blue-950/30 rounded-full border border-blue-900/20 relative overflow-hidden">
+                <motion.div className="absolute inset-0 bg-blue-500 shadow-[0_0_8px_blue]" animate={{ width: `${(hp / MAX_HP) * 100}%` }} />
+              </div>
+              <span className="text-[7px] md:text-[9px] font-bold text-blue-400 whitespace-nowrap">{hp}/{MAX_HP} PV</span>
             </div>
           </div>
         </div>
@@ -760,14 +807,19 @@ useEffect(() => {
               id={`player-board-slot-${i}`}
               slot={slot}
               onSelect={setViewingCard}
-              isAttacking={selectedAttackerIndex === i}
+              isAttacking={selectedAttackerIndex === i || caballoPopupSlot === i}
               hasAttacked={gameState.playerAttackedIndices.includes(i)}
-              isActiveToPlay={selectedHandCardIndex !== null && !slot.card && !selectedIsJoker && canAffordSelected && joker2Phase === null}
+              isActiveToPlay={selectedHandCardIndex !== null && !slot.card && !selectedIsJoker && canAffordSelected && joker2Phase === null && caballoMoveSourceSlot === null}
               isActiveToHeal={isAlliedSlotActiveToHeal(i)}
               isActiveToStack={isActiveToStackLadder(i) && joker2Phase === null}
               isJoker2Target={
                 (joker2Phase === 'board' && slot.card !== null && slot.stack.length === 1) ||
                 (joker2Phase === 'hand' && joker2BoardSlot === i)
+              }
+              isActiveForCaballoMove={
+                caballoMoveSourceSlot !== null &&
+                i !== caballoMoveSourceSlot &&
+                Math.abs(i - caballoMoveSourceSlot) === 1
               }
               onClick={() => handlePlayerSlotClick(i)}
               synergyGlow={playerSynergy.isActive ? playerSynergy.suit : null}
@@ -945,6 +997,73 @@ useEffect(() => {
           sendMessage={sendMessage}
           toggleChat={toggleChat}
         />
+      {/* POPUP CABALLO */}
+      <AnimatePresence>
+        {caballoPopupSlot !== null && (() => {
+          const caballoSlot = board[caballoPopupSlot];
+          const hasAttacked = gameState.playerAttackedIndices.includes(caballoPopupSlot);
+          const hasMoved = caballoSlot.card ? caballoMovedIds.includes(caballoSlot.card.id) : true;
+          const adjacentSlots = [caballoPopupSlot - 1, caballoPopupSlot + 1]
+            .filter(i => i >= 0 && i < 3);
+          const canMove = !hasMoved && adjacentSlots.length > 0;
+          return (
+            <motion.div
+              key="caballo-popup"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[95] flex items-center justify-center"
+              onClick={() => setCaballoPopupSlot(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.85, y: 10 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.85, y: 10 }}
+                className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-5 shadow-2xl flex flex-col gap-3 min-w-[200px]"
+                onClick={e => e.stopPropagation()}
+              >
+                <span className="text-[9px] uppercase tracking-[0.4em] text-primary-gold text-center font-cinzel">Caballo</span>
+                <button
+                  disabled={hasAttacked}
+                  onClick={() => {
+                    setCaballoPopupSlot(null);
+                    setSelectedAttackerIndex(caballoPopupSlot);
+                  }}
+                  className={`py-2.5 px-4 rounded-lg border text-[11px] font-black uppercase tracking-widest transition-all ${
+                    hasAttacked
+                      ? 'opacity-30 cursor-not-allowed border-white/10 text-white/30'
+                      : 'border-red-500/60 text-red-400 hover:bg-red-950/40 cursor-pointer'
+                  }`}
+                >
+                  ⚔ Atacar
+                </button>
+                <button
+                  disabled={!canMove}
+                  onClick={() => {
+                    const src = caballoPopupSlot;
+                    setCaballoPopupSlot(null);
+                    setCaballoMoveSourceSlot(src);
+                  }}
+                  className={`py-2.5 px-4 rounded-lg border text-[11px] font-black uppercase tracking-widest transition-all ${
+                    !canMove
+                      ? 'opacity-30 cursor-not-allowed border-white/10 text-white/30'
+                      : 'border-orange-400/60 text-orange-300 hover:bg-orange-950/40 cursor-pointer'
+                  }`}
+                >
+                  ↔ Moverse
+                </button>
+                <button
+                  onClick={() => setCaballoPopupSlot(null)}
+                  className="text-[9px] text-gray-600 hover:text-gray-400 uppercase tracking-widest pt-1"
+                >
+                  Cancelar
+                </button>
+              </motion.div>
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
+
       <AnimatePresence>
         {viewingCard && (
           <motion.div
@@ -972,16 +1091,20 @@ useEffect(() => {
                   </div>
                 </div>
                 <div className="flex justify-center md:justify-start gap-4">
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-[9px] uppercase tracking-widest text-accent-gray">Ataque</span>
-                    <span className="text-xl font-bold text-red-400">{viewingCard.attack}</span>
-                  </div>
-                  <div className="w-px bg-white/10" />
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-[9px] uppercase tracking-widest text-accent-gray">Vida</span>
-                    <span className="text-xl font-bold text-green-400">{viewingCard.health}</span>
-                  </div>
-                  <div className="w-px bg-white/10" />
+                  {viewingCard.suit !== 'jokers' && (
+                    <>
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-[9px] uppercase tracking-widest text-accent-gray">Ataque</span>
+                        <span className="text-xl font-bold text-red-400">{viewingCard.attack}</span>
+                      </div>
+                      <div className="w-px bg-white/10" />
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-[9px] uppercase tracking-widest text-accent-gray">Vida</span>
+                        <span className="text-xl font-bold text-green-400">{viewingCard.health}</span>
+                      </div>
+                      <div className="w-px bg-white/10" />
+                    </>
+                  )}
                   <div className="flex flex-col items-center gap-1">
                     <span className="text-[9px] uppercase tracking-widest text-accent-gray">Coste</span>
                     <span className="text-xl font-bold text-blue-400">{viewingCard.cost}</span>
@@ -1214,10 +1337,12 @@ const GameCard: React.FC<{
 
             {/* Info inferior: Nombre, Stats y Descripción */}
             <div className="mt-auto text-center md:text-left">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[6px] md:text-[10px] text-white/70 uppercase">ATK: {card.attack}</span>
-                <span className="text-[6px] md:text-[10px] text-white/70 uppercase">HP: {card.health}</span>
-              </div>
+              {card.suit !== 'jokers' && (
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[6px] md:text-[10px] text-white/70 uppercase">ATK: {card.attack}</span>
+                  <span className="text-[6px] md:text-[10px] text-white/70 uppercase">HP: {card.health}</span>
+                </div>
+              )}
               <div className="border-t border-white/10 pt-1 md:pt-2">
                 <p className="text-[5px] md:text-[9px] text-gray-400 italic leading-tight line-clamp-3 md:line-clamp-none">
                   {card.effect}
@@ -1252,9 +1377,10 @@ const BoardSlotView: React.FC<{
   isActiveToHeal?: boolean;
   isActiveToStack?: boolean;
   isJoker2Target?: boolean;
+  isActiveForCaballoMove?: boolean;
   onClick?: () => void;
   synergyGlow?: string | null;
-}> = ({ slot, id, isOpponent: _isOpponent, onSelect, isActiveToPlay, isAttacking, hasAttacked, isActiveToAttack, isActiveToHeal, isActiveToStack, isJoker2Target, onClick, synergyGlow }) => {
+}> = ({ slot, id, isOpponent: _isOpponent, onSelect, isActiveToPlay, isAttacking, hasAttacked, isActiveToAttack, isActiveToHeal, isActiveToStack, isJoker2Target, isActiveForCaballoMove, onClick, synergyGlow }) => {
   return (
     <div
       id={id}
@@ -1275,7 +1401,9 @@ const BoardSlotView: React.FC<{
                     : isActiveToStack
                       ? 'border-amber-500 bg-amber-500/10 animate-pulse cursor-pointer shadow-[0_0_20px_rgba(251,191,36,0.5)] z-30'
                       : 'border-white/5 bg-white/[0.01]'
-          : isActiveToPlay
+          : isActiveForCaballoMove
+            ? 'border-orange-400 bg-orange-400/10 animate-pulse cursor-pointer shadow-[0_0_20px_rgba(251,146,60,0.4)] z-30'
+            : isActiveToPlay
             ? 'border-primary-gold bg-primary-gold/10 animate-pulse cursor-pointer shadow-lg'
             : 'border-white/5 bg-white/[0.01]'}
       `}

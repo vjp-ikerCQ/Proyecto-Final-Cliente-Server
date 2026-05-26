@@ -47,10 +47,12 @@ const CardTile: React.FC<{ card: CardData; onClick: () => void }> = ({ card, onC
           <div className="w-6 md:w-10 h-px bg-white/20 mt-2" />
         </div>
         <div className="mt-auto">
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-[8px] md:text-[11px] text-white/70 uppercase">ATK: {card.attack}</span>
-            <span className="text-[8px] md:text-[11px] text-white/70 uppercase">HP: {card.health}</span>
-          </div>
+          {card.suit !== 'jokers' && (
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-[8px] md:text-[11px] text-white/70 uppercase">ATK: {card.attack}</span>
+              <span className="text-[8px] md:text-[11px] text-white/70 uppercase">HP: {card.health}</span>
+            </div>
+          )}
           <div className="border-t border-white/10 pt-2">
             <p className="text-[7px] md:text-[10px] text-gray-400 italic leading-tight">{card.effect}</p>
           </div>
@@ -269,16 +271,18 @@ const CardGallery: React.FC = () => {
                   <div className="h-1 w-20 md:w-40 bg-primary-gold mx-auto md:mx-0" />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 md:gap-8 max-w-md mx-auto md:mx-0">
-                  <div className="bg-surface border border-accent-gray/20 p-6 md:p-8 rounded-2xl flex flex-col items-center md:items-start group hover:border-red-500/50 transition-colors">
-                      <span className="text-4xl md:text-6xl font-black text-text-main group-hover:text-red-500 transition-colors">{selectedCard.attack}</span>
-                      <span className="text-[10px] md:text-xs uppercase tracking-widest text-muted mt-2">Puntos de Ataque</span>
+                {selectedCard.suit !== 'jokers' && (
+                  <div className="grid grid-cols-2 gap-4 md:gap-8 max-w-md mx-auto md:mx-0">
+                    <div className="bg-surface border border-accent-gray/20 p-6 md:p-8 rounded-2xl flex flex-col items-center md:items-start group hover:border-red-500/50 transition-colors">
+                        <span className="text-4xl md:text-6xl font-black text-text-main group-hover:text-red-500 transition-colors">{selectedCard.attack}</span>
+                        <span className="text-[10px] md:text-xs uppercase tracking-widest text-muted mt-2">Puntos de Ataque</span>
+                    </div>
+                    <div className="bg-surface border border-accent-gray/20 p-6 md:p-8 rounded-2xl flex flex-col items-center md:items-start group hover:border-blue-500/50 transition-colors">
+                        <span className="text-4xl md:text-6xl font-black text-text-main group-hover:text-blue-500 transition-colors">{selectedCard.health}</span>
+                        <span className="text-[10px] md:text-xs uppercase tracking-widest text-muted mt-2">Puntos de Vida</span>
+                    </div>
                   </div>
-                  <div className="bg-surface border border-accent-gray/20 p-6 md:p-8 rounded-2xl flex flex-col items-center md:items-start group hover:border-blue-500/50 transition-colors">
-                      <span className="text-4xl md:text-6xl font-black text-text-main group-hover:text-blue-500 transition-colors">{selectedCard.health}</span>
-                      <span className="text-[10px] md:text-xs uppercase tracking-widest text-muted mt-2">Puntos de Vida</span>
-                  </div>
-                </div>
+                )}
 
                 <div className="relative">
                    <div className="absolute -left-6 top-0 bottom-0 w-1 bg-primary-gold/20 hidden md:block" />

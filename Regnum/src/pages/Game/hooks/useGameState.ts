@@ -56,6 +56,7 @@ export const useGameState = () => {
   const [playerAttackedIndices, setPlayerAttackedIndices] = useState<number[]>([]);
   const [opponentAttackedIndices, setOpponentAttackedIndices] = useState<number[]>([]);
 
+
   // Rastreo de objetivos atacados por Magos en el turno actual (key: índice del mago, value: array de índices de objetivos atacados)
   const [playerMagoAttacks, setPlayerMagoAttacks] = useState<Record<number, number[]>>({});
   const [opponentMagoAttacks, setOpponentMagoAttacks] = useState<Record<number, number[]>>({});
@@ -264,6 +265,7 @@ export const useGameState = () => {
         newBoard[slotIndex] = { card: stackedCard, stack: [...slot.stack, stackedCard] };
         setBoard(newBoard);
         setHand(prev => prev.filter((_, i) => i !== handCardIndex));
+        applyStartDmg(card, slotIndex, true);
       }
     } else {
       const card = opponentHand[handCardIndex];
@@ -803,6 +805,29 @@ export const useGameState = () => {
       return sum;
     }, 0);
 
+  // Mover Caballo a columna contigua (gratuito, una vez por turno)
+  // Si el destino tiene carta, intercambia posiciones
+  const moveCaballo = (fromSlot: number, toSlot: number) => {
+    const slot = board[fromSlot];
+    const target = board[toSlot];
+    if (!slot.card) return;
+    if (Math.abs(fromSlot - toSlot) !== 1) return;
+
+    const movedCard = slot.card;
+    const movedStack = slot.stack;
+
+    // Trasladar el registro de ataque al nuevo slot
+    setPlayerAttackedIndices(prev =>
+      prev.includes(fromSlot) ? [...prev.filter(i => i !== fromSlot), toSlot] : prev
+    );
+
+    const newBoard = [...board];
+    // Si hay carta en el destino, intercambiar; si no, mover y dejar vacío
+    newBoard[fromSlot] = target.card ? { card: target.card, stack: target.stack } : { card: null, stack: [] };
+    newBoard[toSlot] = { card: movedCard, stack: movedStack };
+    setBoard(newBoard);
+  };
+
   // Finalizar turno (jugador o bot)
   const endTurn = (isPlayer: boolean) => {
     // Aplica veneno y sangrado; recoge muertes para el discard; si hasCopasBonus, purga y cura
@@ -906,5 +931,6 @@ export const useGameState = () => {
     joker1Swap,
     joker3Resurrect,
     joker2Swap,
+    moveCaballo,
   };
 };

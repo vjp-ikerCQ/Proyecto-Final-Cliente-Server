@@ -5,6 +5,11 @@ const roleByRank = {
     6: 'CURANDERO', 7: 'TIRADOR', 8: 'PICARO', 9: 'MAGO',
     10: 'SOTA', 11: 'CABALLO', 12: 'REY'
 };
+const jokerRoleByRank = { 1: 'JOKER I', 2: 'JOKER II', 3: 'JOKER III' };
+const getRole = (palo, numero, calidad) =>
+    (palo === 'jokers' || palo === 'joker')
+        ? (jokerRoleByRank[numero] || 'JOKER')
+        : (roleByRank[numero] || calidad);
 const targetToAttackType = {
     'area': 'AREA', 'column': 'COLUMNA', 'selected': 'OBJETIVO',
     'multiple': 'MULTIOBJETIVO', 'player': 'DIRECTO',
@@ -62,7 +67,7 @@ const getCards = async (req, res) => {
                 id: carta._id.toString(),
                 name: carta.nombre,
                 suit: paloFormateado === 'joker' ? 'jokers' : paloFormateado,
-                role: roleByRank[carta.numero] || carta.calidad,
+                role: getRole(paloFormateado, carta.numero, carta.calidad),
                 rank: carta.numero,
                 cost: carta.habilidad?.voluntad || 0,
                 attack: carta.habilidad?.cantidad || 0,
@@ -132,7 +137,7 @@ const getShuffledDeck = async (req, res) => {
                 id: carta._id.toString(),
                 name: carta.nombre,
                 suit: paloFormateado === 'joker' ? 'jokers' : paloFormateado,
-                role: roleByRank[carta.numero] || carta.calidad,
+                role: getRole(paloFormateado, carta.numero, carta.calidad),
                 rank: carta.numero,
                 cost: carta.habilidad?.voluntad || 0,
                 attack: carta.habilidad?.cantidad || 0,
