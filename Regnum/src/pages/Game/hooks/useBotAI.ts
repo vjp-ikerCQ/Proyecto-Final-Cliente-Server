@@ -9,6 +9,7 @@ interface BotAIOptions {
   opponentHand: CardData[];
   opponentBoard: BoardSlot[];
   deck: CardData[];
+  discardPile: CardData[];
   setOpponentHand: React.Dispatch<React.SetStateAction<CardData[]>>;
   setDeck: React.Dispatch<React.SetStateAction<CardData[]>>;
   setOpponentVoluntad: React.Dispatch<React.SetStateAction<number>>;
@@ -22,6 +23,8 @@ interface BotAIOptions {
   useJoker: (isPlayer: boolean, handCardIndex: number) => void;
   playCard: (isPlayer: boolean, slotIndex: number, handCardIndex: number) => void;
   drawCard: (isPlayer: boolean) => void;
+  discardCard: (isPlayer: boolean, handCardIndex: number) => void;
+  opponentHasDiscarded: boolean;
   opponentAttackedIndices: number[];
   opponentMagoAttacks: Record<number, number[]>;
 }
@@ -33,6 +36,7 @@ export const useBotAI = ({
   opponentHand,
   opponentBoard,
   deck,
+  discardPile,
   setOpponentHand: _setOpponentHand,
   setDeck: _setDeck,
   setOpponentVoluntad: _setOpponentVoluntad,
@@ -46,6 +50,8 @@ export const useBotAI = ({
   useJoker,
   playCard,
   drawCard,
+  discardCard,
+  opponentHasDiscarded,
   opponentAttackedIndices,
   opponentMagoAttacks
 }: BotAIOptions) => {
@@ -185,8 +191,20 @@ export const useBotAI = ({
         }
       }
 
+      // 3b. Descartar si la mano está llena y no puede jugar ninguna carta
+      if (!actionTaken && !opponentHasDiscarded && opponentHand.length >= 5) {
+        const allSlotsOccupied = opponentBoard.every(s => s.card);
+        if (allSlotsOccupied) {
+          const discardableIdx = opponentHand.findIndex(c => c.suit !== 'jokers');
+          if (discardableIdx !== -1) {
+            discardCard(false, discardableIdx);
+            actionTaken = true;
+          }
+        }
+      }
+
       // 4. Robar cartas
-      if (!actionTaken && opponentVoluntad >= 1 && opponentHand.length < 5 && deck.length > 0) {
+      if (!actionTaken && opponentVoluntad >= 1 && opponentHand.length < 5 && (deck.length > 0 || discardPile.length > 0)) {
         drawCard(false);
         actionTaken = true;
       }
@@ -208,6 +226,7 @@ export const useBotAI = ({
     opponentVoluntad,
     opponentBoard,
     deck,
+    discardPile,
     board,
     hp,
     opponentAttackedIndices,
@@ -215,6 +234,8 @@ export const useBotAI = ({
     useJoker,
     playCard,
     drawCard,
+    discardCard,
+    opponentHasDiscarded,
     healCard,
     attackCard,
     attackDirectly,

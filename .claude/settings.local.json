@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node -e \"const P = require\\('./node_modules/phaser/dist/phaser.cjs.js'\\); console.log\\('AUTO:', P.AUTO\\); console.log\\('Game:', typeof P.Game\\); console.log\\('Scene:', typeof P.Scene\\);\")"
+      "Bash(node -e \"const P = require\\('./node_modules/phaser/dist/phaser.cjs.js'\\); console.log\\('AUTO:', P.AUTO\\); console.log\\('Game:', typeof P.Game\\); console.log\\('Scene:', typeof P.Scene\\);\")",
+      "Bash(npx tsc *)"
     ]
   }
 }

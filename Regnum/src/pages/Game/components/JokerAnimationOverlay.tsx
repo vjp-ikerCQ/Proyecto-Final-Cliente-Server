@@ -17,10 +17,13 @@ export const JokerAnimationOverlay: React.FC<JokerAnimationOverlayProps> = ({
     if (!containerRef.current) return;
 
     const isJoker3 = jokerCard.rank === 3;
+    const isJoker1 = jokerCard.rank === 1;
     const icons: string[] = isJoker3
       ? ['💀', '🃏', '💀', '🃏', '💀', '🃏']
-      : ['🃏', '↩', '🃏', '↩', '🃏', '↩'];
-    const label = isJoker3 ? 'RESURRECCIÓN' : 'RETORNO';
+      : isJoker1
+        ? ['🃏', '⇄', '🃏', '⇄', '🃏', '⇄']
+        : ['🃏', '↩', '🃏', '↩', '🃏', '↩'];
+    const label = isJoker3 ? 'RESURRECCIÓN' : isJoker1 ? 'INTERCAMBIO' : 'RETORNO';
     const cardImagePath = jokerCard.image;
     const W = window.innerWidth;
     const H = window.innerHeight;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Swords, Layers, ArrowLeft } from 'lucide-react';
+import { Shield, Swords, ArrowLeft } from 'lucide-react';
+import backCardImage from '../../assets/images/backCard.png';
 import { useNavigate } from 'react-router-dom';
 import { type CardData } from '../../utils/cardData';
 import { useGameState, type BoardSlot } from './hooks/useGameState';
@@ -12,6 +13,7 @@ import { GameOverOverlay } from './components/GameOverOverlay';
 import { useChat } from './hooks/useChat';
 import { ChatOverlay } from './components/ChatOverlay';
 import { AttackAnimationOverlay } from './components/AttackAnimationOverlay';
+import { JokerAnimationOverlay } from './components/JokerAnimationOverlay';
 
 const MAX_HP = 30;
 
@@ -61,6 +63,8 @@ const Game: React.FC<GameProps> = ({ user }) => {
     playerHasDiscarded,
     discardCard,
     discardPile,
+    reshuffleCount,
+    joker1Swap,
     joker3Resurrect,
     joker2Swap,
   } = gameState;
@@ -90,6 +94,11 @@ const Game: React.FC<GameProps> = ({ user }) => {
   //              'hand'  = esperando que elija carta de la mano para intercambiar
   const [joker2Phase, setJoker2Phase] = useState<'board' | 'hand' | null>(null);
   const [joker2BoardSlot, setJoker2BoardSlot] = useState<number | null>(null);
+
+  // joker1Phase: 'player' = eligiendo 2 cartas propias; 'opponent' = eligiendo 2 del rival
+  const [joker1Phase, setJoker1Phase] = useState<'player' | 'opponent' | null>(null);
+  const [joker1PlayerSelections, setJoker1PlayerSelections] = useState<number[]>([]);
+  const [joker1OpponentSelections, setJoker1OpponentSelections] = useState<number[]>([]);
 
   // --- Sistema de Animaciones de Combate (PhaserJS) ---
   interface AttackAnimState {
@@ -167,6 +176,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
     opponentHand,
     opponentBoard,
     deck,
+    discardPile,
     setOpponentHand,
     setDeck,
     setOpponentVoluntad,
@@ -180,6 +190,8 @@ const Game: React.FC<GameProps> = ({ user }) => {
     useJoker: gameState.useJoker,
     playCard: gameState.playCard,
     drawCard: gameState.drawCard,
+    discardCard: gameState.discardCard,
+    opponentHasDiscarded: gameState.opponentHasDiscarded,
     opponentAttackedIndices: gameState.opponentAttackedIndices,
     opponentMagoAttacks: gameState.opponentMagoAttacks
   });
@@ -212,6 +224,11 @@ useEffect(() => {
     const timer = setTimeout(() => setWarningText(null), 2000);
     return () => clearTimeout(timer);
   }, [warningText]);
+
+  useEffect(() => {
+    if (reshuffleCount === 0) return;
+    setWarningText('¡Mazo agotado! Los descartes se han rebarajado — ambos jugadores reciben 5 de daño');
+  }, [reshuffleCount]);
 
   useEffect(() => {
     if (isLoading || statsUpdated.current) return;
@@ -336,6 +353,9 @@ useEffect(() => {
     setJokerAnim(null);
     setJoker2Phase(null);
     setJoker2BoardSlot(null);
+    setJoker1Phase(null);
+    setJoker1PlayerSelections([]);
+    setJoker1OpponentSelections([]);
     initializeGame();
   };
 
@@ -374,13 +394,22 @@ useEffect(() => {
     const card = hand[selectedHandCardIndex];
     if (!card || card.suit !== 'jokers') return;
 
-    if (card.rank === 2 || card.rank === 3) {
-      // Guarda datos para la animación antes de sacar la carta de la mano
+    if (card.rank === 1) {
+      if (hand.length - 1 < 2) {
+        setWarningText('Necesitas al menos 2 cartas en la mano para intercambiar');
+        return;
+      }
+      if (opponentHand.length < 2) {
+        setWarningText('El rival necesita al menos 2 cartas para intercambiar');
+        return;
+      }
+    }
+
+    if (card.rank === 1 || card.rank === 2 || card.rank === 3) {
       setJokerAnim({ card, rank: card.rank });
-      useJoker(true, selectedHandCardIndex); // saca carta, -1 voluntad, añade al discard
+      useJoker(true, selectedHandCardIndex);
       setSelectedHandCardIndex(null);
     } else {
-      // Joker 1 u otros: comportamiento actual sin animación
       useJoker(true, selectedHandCardIndex);
       setSelectedHandCardIndex(null);
     }
@@ -395,6 +424,10 @@ useEffect(() => {
       if (!success) setWarningText('Pila de descartes vacía — Joker usado en vano');
     } else if (rank === 2) {
       setJoker2Phase('board');
+    } else if (rank === 1) {
+      setJoker1Phase('player');
+      setJoker1PlayerSelections([]);
+      setJoker1OpponentSelections([]);
     }
   };
 
@@ -429,10 +462,48 @@ useEffect(() => {
     setSelectedAttackerIndex(null);
     setJoker2Phase(null);
     setJoker2BoardSlot(null);
+    setJoker1Phase(null);
+    setJoker1PlayerSelections([]);
+    setJoker1OpponentSelections([]);
+  };
+
+  const handleOpponentHandCardClick = (i: number) => {
+    if (joker1Phase !== 'opponent') return;
+    if (joker1OpponentSelections.includes(i)) {
+      setJoker1OpponentSelections(prev => prev.filter(idx => idx !== i));
+      return;
+    }
+    if (joker1OpponentSelections.length >= 2) return;
+    const newSel = [...joker1OpponentSelections, i];
+    setJoker1OpponentSelections(newSel);
+    if (newSel.length === 2) {
+      joker1Swap(joker1PlayerSelections, newSel);
+      setJoker1Phase(null);
+      setJoker1PlayerSelections([]);
+      setJoker1OpponentSelections([]);
+    }
+  };
+
+  const handleJoker1Cancel = () => {
+    setJoker1Phase(null);
+    setJoker1PlayerSelections([]);
+    setJoker1OpponentSelections([]);
   };
 
   // Clic en carta de la mano — distingue si estamos en modo Joker 2 (intercambio)
   const handleHandCardClick = (i: number) => {
+    // Joker 1: selección de cartas propias
+    if (joker1Phase === 'player') {
+      if (joker1PlayerSelections.includes(i)) {
+        setJoker1PlayerSelections(prev => prev.filter(idx => idx !== i));
+      } else if (joker1PlayerSelections.length < 2) {
+        const newSel = [...joker1PlayerSelections, i];
+        setJoker1PlayerSelections(newSel);
+        if (newSel.length === 2) setJoker1Phase('opponent');
+      }
+      return;
+    }
+
     if (joker2Phase === 'hand' && joker2BoardSlot !== null) {
       const card = hand[i];
       if (card.suit === 'jokers') {
@@ -619,6 +690,42 @@ useEffect(() => {
 
       {/* TABLERO */}
       <main className="flex-1 relative z-10 flex flex-col justify-center items-center gap-2 md:gap-4 p-2 md:p-4 overflow-visible">
+
+        {/* Mano del rival boca abajo — asoma desde la parte superior */}
+        <div className="absolute top-0 left-0 right-0 flex justify-center gap-1 md:gap-2 pointer-events-none" style={{ zIndex: 5 }}>
+          <AnimatePresence mode="popLayout">
+            {opponentHand.map((_, i) => {
+              const isOppSel = joker1Phase === 'opponent' && joker1OpponentSelections.includes(i);
+              const isSelectable = joker1Phase === 'opponent';
+              return (
+                <motion.div
+                  key={`opp-hand-peek-${i}`}
+                  initial={{ y: '-75%' }}
+                  animate={{ y: isOppSel ? '-10%' : isSelectable ? '-45%' : '-72%' }}
+                  exit={{ y: '-85%', opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 280, damping: 24 }}
+                  className={`relative w-10 sm:w-12 md:w-14 aspect-[2/3] shrink-0 rounded-md border-2 overflow-hidden transition-shadow ${
+                    isOppSel
+                      ? 'border-purple-400 shadow-[0_0_18px_rgba(168,85,247,0.8)] pointer-events-auto cursor-pointer'
+                      : isSelectable
+                        ? 'border-purple-500/50 pointer-events-auto cursor-pointer hover:border-purple-400/80'
+                        : 'border-white/10'
+                  }`}
+                  onClick={() => isSelectable && handleOpponentHandCardClick(i)}
+                >
+                  <img src={backCardImage} className="w-full h-full object-cover opacity-80" />
+                  {isOppSel && <div className="absolute inset-0 bg-purple-500/20" />}
+                  {isSelectable && !isOppSel && (
+                    <div className="absolute bottom-1 left-0 right-0 flex justify-center">
+                      <span className="text-[6px] text-purple-400 font-bold uppercase tracking-widest">?</span>
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        </div>
+
         <div className="relative flex justify-center gap-2 md:gap-4 w-full max-w-3xl overflow-visible">
           {opponentBoard.map((slot, i) => (
             <BoardSlotView
@@ -676,52 +783,78 @@ useEffect(() => {
 
       {/* FOOTER: Mano y Controles */}
       <footer className={`relative z-20 p-2 md:p-3 bg-gradient-to-t from-black via-black/95 to-transparent flex flex-col md:flex-row justify-center items-center gap-2 md:gap-6 shrink-0 border-t border-white/5 overflow-visible transition-opacity duration-500 ${!isPlayerTurn ? 'opacity-50 pointer-events-none' : ''}`}>
-        <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto justify-center overflow-visible">
-          {/* Mazo + Pila de Descartes */}
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={handleDrawCard}>
-              <div className="w-10 sm:w-14 md:w-16 aspect-[2/3] border border-white/10 rounded-md bg-[#080808] flex items-center justify-center group-hover:border-primary-gold/50 transition-all shadow-2xl relative overflow-hidden shrink-0">
-                <Layers className="text-white/10 group-hover:text-primary-gold/40 transition-colors" size={16} />
-                <div className="absolute inset-0 bg-gradient-to-tr from-primary-gold/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <span className="text-[6px] md:text-[8px] uppercase tracking-widest text-gray-500 font-bold">Mazo | 1v</span>
-            </div>
+        <div className="flex items-end gap-1 md:gap-3 w-full md:w-auto justify-center overflow-visible">
 
-            {/* Pila de Descartes (zona de arrastre) */}
-            <div
-              onDragOver={(e) => { e.preventDefault(); if (!playerHasDiscarded) setIsDragOverDiscard(true); }}
-              onDragLeave={() => setIsDragOverDiscard(false)}
-              onDrop={handleDiscardDrop}
-              className={`flex flex-col items-center gap-1 transition-opacity ${playerHasDiscarded ? 'opacity-40' : ''}`}
-            >
-              <div className={`w-10 sm:w-14 md:w-16 aspect-[2/3] border rounded-md relative overflow-hidden shrink-0 transition-all ${
-                isDragOverDiscard && !playerHasDiscarded
-                  ? 'border-red-400 bg-red-950/30 shadow-[0_0_12px_rgba(239,68,68,0.3)]'
-                  : 'border-white/10 bg-[#080808]'
-              }`}>
-                {discardPile.length > 0 ? (
-                  <>
-                    <img src={discardPile[discardPile.length - 1].image} className="w-full h-full object-cover opacity-50" />
-                    <div className="absolute bottom-0 right-0 bg-black/80 text-white/60 text-[7px] px-1 font-bold">{discardPile.length}</div>
-                  </>
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-white/10 text-lg">⊗</div>
-                )}
-              </div>
-              <span className="text-[6px] md:text-[8px] uppercase tracking-widest text-gray-500 font-bold">
-                {playerHasDiscarded ? 'Descartada ✓' : 'Descarte'}
-              </span>
+          {/* MAZO — fijo izquierda */}
+          <div
+            className="flex flex-col items-center gap-1 shrink-0 cursor-pointer group"
+            onClick={handleDrawCard}
+          >
+            <div className="relative w-10 sm:w-16 md:w-20 lg:w-24 aspect-[2/3] rounded-md border-2 border-white/10 group-hover:border-primary-gold/50 transition-all shadow-2xl overflow-hidden bg-[#080808]">
+              {deck.length > 0 ? (
+                <img src={backCardImage} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-white/10 text-xl">⊗</div>
+              )}
+              <div className="absolute inset-0 bg-gradient-to-tr from-primary-gold/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[6px] md:text-[8px] uppercase tracking-widest text-gray-500 font-bold">Mazo</span>
+              <span className="text-[7px] md:text-[9px] font-black text-primary-gold">{deck.length}</span>
             </div>
           </div>
 
-          <div className="flex gap-1 md:gap-3 items-end px-1 md:px-4 pt-4 md:pt-6 pb-1 overflow-x-auto overflow-y-visible max-w-[75vw] md:max-w-none scrollbar-hide">
-            <AnimatePresence>
+          {/* DESCARTES — fijo entre mazo y mano */}
+          <div
+            className="flex flex-col items-center gap-1 shrink-0"
+            onDragOver={(e) => { e.preventDefault(); if (!playerHasDiscarded) setIsDragOverDiscard(true); }}
+            onDragLeave={() => setIsDragOverDiscard(false)}
+            onDrop={handleDiscardDrop}
+          >
+            <div className={`relative w-10 sm:w-16 md:w-20 lg:w-24 aspect-[2/3] rounded-md border-2 overflow-hidden bg-[#080808] transition-all ${
+              isDragOverDiscard && !playerHasDiscarded
+                ? 'border-red-400 bg-red-950/30 shadow-[0_0_12px_rgba(239,68,68,0.3)]'
+                : playerHasDiscarded
+                  ? 'border-white/5 opacity-60'
+                  : 'border-white/10'
+            }`}>
+              {discardPile.length > 0 ? (
+                <img src={backCardImage} className="w-full h-full object-cover opacity-80" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-white/10 text-xl">⊗</div>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[6px] md:text-[8px] uppercase tracking-widest text-gray-500 font-bold">
+                {playerHasDiscarded ? '✓ Desc.' : 'Descarte'}
+              </span>
+              <AnimatePresence mode="popLayout">
+                <motion.span
+                  key={discardPile.length}
+                  initial={{ scale: 1.8, color: '#a68a64' }}
+                  animate={{ scale: 1, color: '#9ca3af' }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 18 }}
+                  className="text-[7px] md:text-[9px] font-black"
+                >
+                  {discardPile.length}
+                </motion.span>
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* MANO — 5 slots fijos, las pilas no se desplazan */}
+          <div className="flex gap-1 md:gap-2 items-end pt-5 md:pt-6 pb-1 pr-4 md:pr-5 overflow-visible">
+            <AnimatePresence mode="popLayout">
               {hand.map((card, i) => (
                 <GameCard
-                  key={`${card.id}-${i}`}
+                  key={card.id}
                   card={card}
                   isSelected={selectedHandCardIndex === i}
-                  isJoker2Swap={joker2Phase === 'hand' && card.suit !== 'jokers'}
+                  isJoker1Sel={joker1Phase === 'player' && joker1PlayerSelections.includes(i)}
+                  isJoker2Swap={
+                    (joker2Phase === 'hand' && card.suit !== 'jokers') ||
+                    (joker1Phase === 'player' && !joker1PlayerSelections.includes(i))
+                  }
                   onClick={() => handleHandCardClick(i)}
                   onRightClick={(e) => {
                     e.preventDefault();
@@ -733,12 +866,27 @@ useEffect(() => {
                 />
               ))}
             </AnimatePresence>
+            {Array.from({ length: Math.max(0, 5 - hand.length) }).map((_, i) => (
+              <div
+                key={`hand-placeholder-${i}`}
+                className="relative aspect-[2/3] w-12 sm:w-16 md:w-24 lg:w-28 shrink-0 rounded-md border border-white/5 bg-white/[0.015]"
+              />
+            ))}
           </div>
         </div>
 
         <div className="flex md:flex-col gap-2 md:gap-3 items-center w-full md:w-48 px-4 pb-2">
           <AnimatePresence mode="wait">
-            {joker2Phase !== null ? (
+            {joker1Phase !== null ? (
+              <motion.button
+                key="joker1-cancel"
+                initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+                onClick={handleJoker1Cancel}
+                className="flex-1 md:w-full py-2.5 md:py-4 px-4 bg-purple-950/60 text-purple-300 font-black uppercase tracking-widest rounded border border-purple-700/60 shadow-xl hover:bg-purple-900/60 transition-all text-[9px] md:text-xs text-center"
+              >
+                Cancelar Joker
+              </motion.button>
+            ) : joker2Phase !== null ? (
               /* Modo Joker 2: solo se muestra el botón de cancelar */
               <motion.button
                 key="joker2-cancel"
@@ -769,8 +917,8 @@ useEffect(() => {
             )}
           </AnimatePresence>
 
-          {/* Botón DESCARTAR (oculto durante Joker 2) */}
-          {joker2Phase === null && (
+          {/* Botón DESCARTAR (oculto durante Jokers) */}
+          {joker2Phase === null && joker1Phase === null && (
             <motion.button
               onClick={handleDiscard}
               disabled={selectedHandCardIndex === null || playerHasDiscarded}
@@ -807,19 +955,42 @@ useEffect(() => {
             <div className="max-w-4xl w-full flex flex-col md:flex-row gap-6 md:gap-12 items-center" onClick={e => e.stopPropagation()}>
               <motion.div
                 initial={{ scale: 0.8 }} animate={{ scale: 1 }}
-                className="w-full max-w-[220px] sm:max-w-[280px] md:max-w-[350px] aspect-[2/3] rounded-xl border border-white/10 shadow-2xl overflow-hidden relative shrink-0 max-h-[65vh] card-holographic"
-                style={{ borderColor: suitColors[viewingCard.suit] }}
+                className="w-full max-w-[180px] sm:max-w-[220px] md:max-w-[280px] shrink-0"
               >
-                <img src={viewingCard.image} className="w-full h-full object-cover" />
+                <div
+                  className="w-full aspect-[2/3] rounded-xl border border-white/10 shadow-2xl overflow-hidden relative card-holographic"
+                  style={{ borderColor: suitColors[viewingCard.suit] }}
+                >
+                  <img src={viewingCard.image} className="w-full h-full object-cover" />
+                </div>
               </motion.div>
-              <div className="flex-1 space-y-4 md:space-y-6 text-center md:text-left">
+              <div className="flex-1 space-y-4 md:space-y-5 text-center md:text-left">
                 <div>
                   <h2 className="text-3xl sm:text-5xl md:text-6xl font-black text-white uppercase tracking-tighter mb-2">{viewingCard.name}</h2>
                   <div className="flex justify-center md:justify-start items-center gap-4">
                     <span className="text-[8px] md:text-[10px] uppercase tracking-widest text-primary-gold border border-primary-gold/30 px-2 py-0.5">{viewingCard.role}</span>
                   </div>
                 </div>
-                <div className="p-4 bg-surface border border-accent-gray/20 rounded-xl italic text-secondary-theme">"{viewingCard.effect}"</div>
+                <div className="flex justify-center md:justify-start gap-4">
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-[9px] uppercase tracking-widest text-accent-gray">Ataque</span>
+                    <span className="text-xl font-bold text-red-400">{viewingCard.attack}</span>
+                  </div>
+                  <div className="w-px bg-white/10" />
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-[9px] uppercase tracking-widest text-accent-gray">Vida</span>
+                    <span className="text-xl font-bold text-green-400">{viewingCard.health}</span>
+                  </div>
+                  <div className="w-px bg-white/10" />
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-[9px] uppercase tracking-widest text-accent-gray">Coste</span>
+                    <span className="text-xl font-bold text-blue-400">{viewingCard.cost}</span>
+                  </div>
+                </div>
+                <div className="p-4 bg-surface border border-accent-gray/20 rounded-xl text-secondary-theme">
+                  <p className="text-[9px] uppercase tracking-widest text-accent-gray mb-2">Descripción</p>
+                  <p>{viewingCard.descripcion || viewingCard.effect || '—'}</p>
+                </div>
                 <button onClick={() => setViewingCard(null)} className="md:hidden w-full py-3 bg-white/10 uppercase tracking-widest text-[10px] font-bold">Cerrar</button>
               </div>
             </div>
@@ -843,6 +1014,29 @@ useEffect(() => {
               <span className="text-primary-gold font-bold uppercase tracking-widest text-[10px] md:text-xs whitespace-nowrap">
                 {warningText}
               </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* INSTRUCCIÓN FLOTANTE JOKER 1 */}
+      <AnimatePresence>
+        {joker1Phase && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-80 pointer-events-none"
+          >
+            <div className="bg-purple-950/95 border border-purple-500/60 rounded-xl px-5 py-3 text-center shadow-[0_0_20px_rgba(168,85,247,0.3)] backdrop-blur-md">
+              <p className="text-purple-300 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em]">
+                ✦ Joker de Intercambio ✦
+              </p>
+              <p className="text-white text-[9px] md:text-xs mt-1 font-medium">
+                {joker1Phase === 'player'
+                  ? `Selecciona 2 cartas de tu mano (${joker1PlayerSelections.length}/2)`
+                  : `Elige 2 cartas del rival a ciegas (${joker1OpponentSelections.length}/2)`}
+              </p>
             </div>
           </motion.div>
         )}
@@ -965,25 +1159,30 @@ useEffect(() => {
 const GameCard: React.FC<{
   card: CardData;
   isSelected?: boolean;
+  isJoker1Sel?: boolean;
   isJoker2Swap?: boolean;
   onClick?: () => void;
   onRightClick?: (e: React.MouseEvent) => void;
   draggable?: boolean;
   onDragStart?: () => void;
   onDragEnd?: () => void;
-}> = ({ card, isSelected, isJoker2Swap, onClick, onRightClick, draggable, onDragStart, onDragEnd }) => {
-  const isHighlighted = isSelected || isJoker2Swap;
+}> = ({ card, isSelected, isJoker1Sel, isJoker2Swap, onClick, onRightClick, draggable, onDragStart, onDragEnd }) => {
+  const isHighlighted = isSelected || isJoker2Swap || isJoker1Sel;
+  const borderColor = isJoker1Sel ? '#fbbf24' : isJoker2Swap ? '#a855f7' : isSelected ? suitColors[card.suit] : `${suitColors[card.suit]}66`;
+  const glowStyle = isJoker1Sel
+    ? '0 0 25px rgba(251,191,36,0.55)'
+    : isJoker2Swap
+      ? '0 0 20px rgba(168,85,247,0.4)'
+      : `0 0 15px ${suitColors[card.suit]}11`;
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 30 }}
-      animate={{
-        opacity: 1,
-        y: 0,
-        scale: isHighlighted ? 1.1 : 1
-      }}
+      initial={{ opacity: 0, rotateY: 90, scale: 0.8 }}
+      animate={{ opacity: 1, rotateY: 0, scale: isHighlighted ? 1.1 : 1 }}
+      exit={{ opacity: 0, rotateY: 90, scale: 0.6, transition: { duration: 0.25 } }}
       whileHover={{ scale: isHighlighted ? 1.15 : 1.05 }}
       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+      style={{ transformPerspective: 800 }}
       className={`
         relative aspect-[2/3] w-12 sm:w-16 md:w-24 lg:w-28 cursor-pointer group shrink-0
         ${isHighlighted ? 'z-50 -translate-y-4' : 'hover:z-40 hover:-translate-y-2'}
@@ -996,11 +1195,8 @@ const GameCard: React.FC<{
     >
       <div
         className={`w-full h-full relative rounded-md md:rounded-lg border-2 bg-[#080808] transition-all duration-500
-          ${isJoker2Swap ? 'shadow-[0_0_30px_rgba(168,85,247,0.6)] animate-pulse' : isSelected ? 'shadow-[0_0_30px_rgba(166,138,100,0.5)] card-holographic' : 'shadow-lg'}`}
-        style={{
-          borderColor: isJoker2Swap ? '#a855f7' : isSelected ? suitColors[card.suit] : `${suitColors[card.suit]}66`,
-          boxShadow: isJoker2Swap ? '0 0 20px rgba(168,85,247,0.4)' : `0 0 15px ${suitColors[card.suit]}11`
-        }}
+          ${isJoker1Sel ? 'shadow-[0_0_28px_rgba(251,191,36,0.6)] animate-pulse' : isJoker2Swap ? 'shadow-[0_0_30px_rgba(168,85,247,0.6)] animate-pulse' : isSelected ? 'shadow-[0_0_30px_rgba(166,138,100,0.5)] card-holographic' : 'shadow-lg'}`}
+        style={{ borderColor, boxShadow: glowStyle }}
       >
         <div className="w-full h-full overflow-hidden relative rounded-[inherit]">
           <img src={card.image} className="w-full h-full object-cover transition-all duration-700" />
@@ -1084,13 +1280,18 @@ const BoardSlotView: React.FC<{
             : 'border-white/5 bg-white/[0.01]'}
       `}
     >
-      {slot.card ? (
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-          className="w-full h-full relative group cursor-pointer overflow-visible"
-          onClick={(e) => { e.stopPropagation(); onClick?.(); }}
-          onContextMenu={(e) => { e.preventDefault(); onSelect(slot.card!); }}
-        >
+      <AnimatePresence>
+        {slot.card && (
+          <motion.div
+            key={slot.card.id}
+            initial={{ scale: 0.8, opacity: 0, rotateY: 90 }}
+            animate={{ scale: 1, opacity: 1, rotateY: 0 }}
+            exit={{ scale: 0.3, opacity: 0, rotateY: 90, transition: { duration: 0.3, ease: 'easeIn' } }}
+            style={{ transformPerspective: 800 }}
+            className="w-full h-full relative group cursor-pointer overflow-visible"
+            onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+            onContextMenu={(e) => { e.preventDefault(); onSelect(slot.card!); }}
+          >
           <div
             className={`w-full h-full relative rounded-md md:rounded-lg border-2 bg-[#080808] transition-all duration-500 group-hover:-translate-y-2 md:group-hover:-translate-y-4 group-hover:z-50`}
             style={(() => {
@@ -1188,8 +1389,10 @@ const BoardSlotView: React.FC<{
               )}
             </div>
           )}
-        </motion.div>
-      ) : (
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {!slot.card && (
         <span className="text-white/5 uppercase tracking-[0.2em] text-[7px] md:text-[10px] font-black italic">
           {isActiveToPlay ? 'Play' : ''}
         </span>

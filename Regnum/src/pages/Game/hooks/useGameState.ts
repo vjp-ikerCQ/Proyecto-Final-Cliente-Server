@@ -60,9 +60,12 @@ export const useGameState = () => {
   const [playerMagoAttacks, setPlayerMagoAttacks] = useState<Record<number, number[]>>({});
   const [opponentMagoAttacks, setOpponentMagoAttacks] = useState<Record<number, number[]>>({});
 
-  // Descarte (máximo 1 por ronda, coste 0)
+  // Descarte (máximo 1 por ronda, coste 0) — pila compartida
   const [playerHasDiscarded, setPlayerHasDiscarded] = useState(false);
+  const [opponentHasDiscarded, setOpponentHasDiscarded] = useState(false);
   const [discardPile, setDiscardPile] = useState<CardData[]>([]);
+  // Señal de rebaraje: se incrementa cada vez que los descartes pasan al mazo
+  const [reshuffleCount, setReshuffleCount] = useState(0);
 
   // Inicializar mazo
   const initializeGame = async () => {
@@ -81,6 +84,7 @@ export const useGameState = () => {
     setPlayerMagoAttacks({});
     setOpponentMagoAttacks({});
     setPlayerHasDiscarded(false);
+    setOpponentHasDiscarded(false);
     setDiscardPile([]);
     setIsPlayerTurn(true);
 
@@ -91,7 +95,7 @@ export const useGameState = () => {
       const playerInitialHand = sharedShuffledDeck.slice(0, 3);
       // Repartir al oponente
       const opponentInitialHand = sharedShuffledDeck.slice(3, 6);
-      // Mazo compartido
+      // Mazo compartido con el resto de cartas
       const remainingDeck = sharedShuffledDeck.slice(6);
 
       setHand(playerInitialHand);
@@ -162,23 +166,48 @@ export const useGameState = () => {
       });
   }, []);
 
-  // Robar carta (jugador o bot)
-  const drawCard = (isPlayer: boolean) => {
-    if (isPlayer) {
-      if (voluntad >= 1 && hand.length < 5 && deck.length > 0) {
-        const nextCard = deck[0];
-        setHand(prev => [...prev, nextCard]);
-        setDeck(prev => prev.slice(1));
-        setVoluntad(v => v - 1);
-      }
-    } else {
-      if (opponentVoluntad >= 1 && opponentHand.length < 5 && deck.length > 0) {
-        const nextCard = deck[0];
-        setOpponentHand(prev => [...prev, nextCard]);
-        setDeck(prev => prev.slice(1));
-        setOpponentVoluntad(v => v - 1);
-      }
+  // Fisher-Yates shuffle
+  const shuffle = <T>(arr: T[]): T[] => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
     }
+    return a;
+  };
+
+  // Robar carta (jugador o bot).
+  // Si el mazo está vacío: rebarajea la pila de descartes como nuevo mazo
+  // y ambos jugadores reciben 5 de daño como penalización.
+  const drawCard = (isPlayer: boolean) => {
+    const currentVoluntad = isPlayer ? voluntad : opponentVoluntad;
+    const currentHand    = isPlayer ? hand : opponentHand;
+
+    if (currentVoluntad < 1 || currentHand.length >= 5) return;
+
+    // Determinar de qué pila robar (mazo actual o descartes rebarajados)
+    let sourceDeck = deck;
+    if (sourceDeck.length === 0) {
+      if (discardPile.length === 0) return; // sin cartas disponibles
+      // Rebarajar descartes → nuevo mazo; penalización de 5 HP a ambos
+      sourceDeck = shuffle(discardPile);
+      setDiscardPile([]);
+      setHp(prev  => Math.max(0, prev - 5));
+      setOpponentHp(prev => Math.max(0, prev - 5));
+      setReshuffleCount(c => c + 1);
+    }
+
+    const nextCard  = sourceDeck[0];
+    const remaining = sourceDeck.slice(1);
+
+    if (isPlayer) {
+      setHand(prev => [...prev, nextCard]);
+      setVoluntad(v => v - 1);
+    } else {
+      setOpponentHand(prev => [...prev, nextCard]);
+      setOpponentVoluntad(v => v - 1);
+    }
+    setDeck(remaining);
   };
 
   const applyStartDmg = (card: CardData, slotIndex: number, isPlayer: boolean) => {
@@ -281,6 +310,21 @@ export const useGameState = () => {
     }
   };
 
+  // Joker 1 — Intercambio: intercambia 2 cartas del jugador por 2 del rival
+  const joker1Swap = (playerIndices: number[], opponentIndices: number[]) => {
+    if (playerIndices.length !== 2 || opponentIndices.length !== 2) return;
+    const newHand = [...hand];
+    const newOpponentHand = [...opponentHand];
+    const p0 = newHand[playerIndices[0]];
+    const p1 = newHand[playerIndices[1]];
+    newHand[playerIndices[0]] = newOpponentHand[opponentIndices[0]];
+    newHand[playerIndices[1]] = newOpponentHand[opponentIndices[1]];
+    newOpponentHand[opponentIndices[0]] = p0;
+    newOpponentHand[opponentIndices[1]] = p1;
+    setHand(newHand);
+    setOpponentHand(newOpponentHand);
+  };
+
   // Joker 3 — Resurrección: saca una carta aleatoria de la pila de descartes y la añade a la mano del jugador
   // Devuelve false si la pila estaba vacía
   const joker3Resurrect = (): boolean => {
@@ -327,15 +371,23 @@ export const useGameState = () => {
     return 'ok';
   };
 
-  // Descartar una carta de la mano (solo jugador, máx 1 por ronda, coste 0)
+  // Descartar una carta de la mano (máx 1 por ronda, coste 0) — pila compartida
   const discardCard = (isPlayer: boolean, handCardIndex: number) => {
-    if (!isPlayer) return;
-    if (playerHasDiscarded) return;
-    const card = hand[handCardIndex];
-    if (!card) return;
-    setHand(prev => prev.filter((_, i) => i !== handCardIndex));
-    setDiscardPile(prev => [...prev, card]);
-    setPlayerHasDiscarded(true);
+    if (isPlayer) {
+      if (playerHasDiscarded) return;
+      const card = hand[handCardIndex];
+      if (!card) return;
+      setHand(prev => prev.filter((_, i) => i !== handCardIndex));
+      setDiscardPile(prev => [...prev, card]);
+      setPlayerHasDiscarded(true);
+    } else {
+      if (opponentHasDiscarded) return;
+      const card = opponentHand[handCardIndex];
+      if (!card) return;
+      setOpponentHand(prev => prev.filter((_, i) => i !== handCardIndex));
+      setDiscardPile(prev => [...prev, card]);
+      setOpponentHasDiscarded(true);
+    }
   };
 
   // Comprobar si un mago específico ya atacó a un objetivo en el turno actual
@@ -439,7 +491,9 @@ export const useGameState = () => {
           const rHealth = tCard.health - eDamage;
 
           if (rHealth <= 0) {
-            setDiscardPile(prev => [...prev, ...newDefenderBoard[i].stack]);
+            // Capturar el stack ANTES de limpiar el slot para evitar stale closure
+            const killedStack = newDefenderBoard[i].stack;
+            setDiscardPile(prev => [...prev, ...killedStack]);
             newDefenderBoard[i] = { card: null, stack: [] };
           } else {
             let uTarget: CardData = { ...tCard, health: rHealth };
@@ -452,7 +506,9 @@ export const useGameState = () => {
       }
     } else {
       if (remainingHealth <= 0) {
-        setDiscardPile(prev => [...prev, ...newDefenderBoard[targetSlotIndex].stack]);
+        // Capturar el stack ANTES de limpiar el slot para evitar stale closure
+        const killedStack = newDefenderBoard[targetSlotIndex].stack;
+        setDiscardPile(prev => [...prev, ...killedStack]);
         newDefenderBoard[targetSlotIndex] = { card: null, stack: [] };
       } else {
         let updatedTarget: CardData = { ...targetCard, health: remainingHealth };
@@ -476,7 +532,8 @@ export const useGameState = () => {
             const rHealth = sideCard.health - eDamage;
 
             if (rHealth <= 0) {
-              setDiscardPile(prev => [...prev, ...newDefenderBoard[idx].stack]);
+              const killedStack = newDefenderBoard[idx].stack;
+              setDiscardPile(prev => [...prev, ...killedStack]);
               newDefenderBoard[idx] = { card: null, stack: [] };
             } else {
               let uTarget: CardData = { ...sideCard, health: rHealth };
@@ -798,6 +855,7 @@ export const useGameState = () => {
       setOpponentVoluntad(v => Math.min(v + 2 + bonus + oroBonus, 10));
       setOpponentAttackedIndices([]);
       setOpponentMagoAttacks({});
+      setOpponentHasDiscarded(false);
       setIsPlayerTurn(true);
       const { newBoard: newPlayerBoard, deaths: playerDeaths } = applyTurnEndEffects(board, playerSynergy === 'copas');
       setBoard(newPlayerBoard);
@@ -841,8 +899,11 @@ export const useGameState = () => {
     opponentMagoAttacks,
     hasMagoAttackedTarget,
     playerHasDiscarded,
+    opponentHasDiscarded,
     discardCard,
     discardPile,
+    reshuffleCount,
+    joker1Swap,
     joker3Resurrect,
     joker2Swap,
   };
