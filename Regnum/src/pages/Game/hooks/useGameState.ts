@@ -797,6 +797,25 @@ export const useGameState = () => {
     setAttackerAttackedIndices(prev => [...prev, healerSlotIndex]);
   };
 
+  // Curación del As de Copas: +3 HP, elimina veneno y sangrado (no quita escudo)
+  const healCardCopa = (targetSlotIndex: number) => {
+    const targetSlot = board[targetSlotIndex];
+    if (!targetSlot.card) return;
+    const card = targetSlot.card;
+    const maxHp = card.maxHealth ?? getMaxHealthByRank(card.rank);
+    const newBoard = [...board];
+    newBoard[targetSlotIndex] = {
+      ...targetSlot,
+      card: {
+        ...card,
+        health: Math.min(maxHp, card.health + 3),
+        poisonTurns: 0,
+        bleedTurns: 0,
+      },
+    };
+    setBoard(newBoard);
+  };
+
   const clerigoPassiveBonus = (slots: BoardSlot[]): number =>
     slots.reduce((sum, slot) => {
       if (slot.card && slot.card.rank === 5 && typeof slot.card.attack === 'number') {
@@ -932,5 +951,6 @@ export const useGameState = () => {
     joker3Resurrect,
     joker2Swap,
     moveCaballo,
+    healCardCopa,
   };
 };
