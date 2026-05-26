@@ -1,7 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { motion, type Variants } from 'framer-motion';
 import { Crown, Skull, RotateCcw, Home, Trophy, Flame } from 'lucide-react';
-import { useSettings } from '../../../contexts/SettingsContext';
 
 interface GameOverOverlayProps {
   result: 'victory' | 'defeat';
@@ -427,11 +426,10 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className={`relative max-w-lg w-full z-20 p-8 md:p-12 rounded-3xl border text-center backdrop-blur-xl shadow-[0_0_80px_rgba(0,0,0,0.9)] overflow-hidden ${
-          isVic
+        className={`relative max-w-lg w-full z-20 p-8 md:p-12 rounded-3xl border text-center backdrop-blur-xl shadow-[0_0_80px_rgba(0,0,0,0.9)] overflow-hidden ${isVic
             ? 'bg-[#080d08]/75 border-primary-gold/45 shadow-[0_0_50px_rgba(166,138,100,0.15)]'
             : 'bg-[#0f0909]/75 border-red-950/45 shadow-[0_0_50px_rgba(220,38,38,0.1)]'
-        }`}
+          }`}
       >
         {/* Adornos esquineros estilo manuscrito medieval */}
         <div className={`absolute top-2 left-2 w-8 h-8 border-t-2 border-l-2 opacity-35 ${isVic ? 'border-primary-gold' : 'border-red-700'}`} />
@@ -443,19 +441,17 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
         <motion.div variants={badgeVariants} className="flex justify-center mb-6 relative">
           {/* Brillos mágicos tras el emblema */}
           <div
-            className={`absolute w-32 h-32 rounded-full filter blur-2xl opacity-45 -z-10 animate-pulse ${
-              isVic ? 'bg-primary-gold/30' : 'bg-red-600/20'
-            }`}
+            className={`absolute w-32 h-32 rounded-full filter blur-2xl opacity-45 -z-10 animate-pulse ${isVic ? 'bg-primary-gold/30' : 'bg-red-600/20'
+              }`}
           />
 
           <motion.div
             variants={isVic ? crownSparkleVariants : skullBurnVariants}
             animate="animate"
-            className={`w-24 h-24 rounded-full flex items-center justify-center border-2 shadow-inner bg-gradient-to-b ${
-              isVic
+            className={`w-24 h-24 rounded-full flex items-center justify-center border-2 shadow-inner bg-gradient-to-b ${isVic
                 ? 'from-[#1c1813] to-[#0c0a08] border-primary-gold/60 shadow-[0_0_20px_rgba(166,138,100,0.3)]'
                 : 'from-[#1a0e0e] to-[#0b0505] border-red-900/60 shadow-[0_0_20px_rgba(220,38,38,0.2)]'
-            }`}
+              }`}
           >
             {isVic ? (
               <Crown className="w-12 h-12 text-[#ffcc00] filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]" />
@@ -468,11 +464,10 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
         {/* 2. Título de Victoria o Derrota */}
         <motion.h1
           variants={itemVariants}
-          className={`text-5xl md:text-7xl font-cinzel font-black tracking-[0.08em] mb-4 drop-shadow-[0_3px_6px_rgba(0,0,0,0.8)] ${
-            isVic
+          className={`text-5xl md:text-7xl font-cinzel font-black tracking-[0.08em] mb-4 drop-shadow-[0_3px_6px_rgba(0,0,0,0.8)] ${isVic
               ? 'text-gold-gradient bg-clip-text'
               : 'text-transparent bg-gradient-to-b from-red-500 via-red-600 to-red-800 bg-clip-text'
-          }`}
+            }`}
           style={{
             WebkitBackgroundClip: 'text',
           }}
@@ -510,11 +505,10 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
             whileHover={{ scale: 1.04, y: -2 }}
             whileTap={{ scale: 0.97 }}
             onClick={onRestart}
-            className={`relative flex items-center justify-center gap-2.5 w-full sm:flex-1 py-4 px-8 font-cinzel font-black uppercase tracking-[0.2em] text-[11px] rounded-lg border transition-all duration-300 shadow-lg cursor-pointer ${
-              isVic
+            className={`relative flex items-center justify-center gap-2.5 w-full sm:flex-1 py-4 px-8 font-cinzel font-black uppercase tracking-[0.2em] text-[11px] rounded-lg border transition-all duration-300 shadow-lg cursor-pointer ${isVic
                 ? 'bg-gradient-to-b from-[#d4bb92]/20 to-[#a68a64]/10 text-primary-gold border-primary-gold/50 hover:border-primary-gold hover:shadow-[0_0_20px_rgba(166,138,100,0.3)]'
                 : 'bg-gradient-to-b from-red-950/40 to-red-950/20 text-red-400 border-red-900/40 hover:border-red-500 hover:text-red-300 hover:shadow-[0_0_20px_rgba(220,38,38,0.25)]'
-            }`}
+              }`}
           >
             <RotateCcw className="w-4 h-4" />
             <span>Volver a Jugar</span>

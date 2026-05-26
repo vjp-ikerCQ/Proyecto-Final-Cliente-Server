@@ -69,22 +69,22 @@ export const SUIT_SYNERGY_BONUSES: Record<Suit, SuitSynergyBonus> = {
   espadas: {
     voluntadBonus: 0,
     hpBonus: 0,
-    description: 'Sinergia de Espadas: todas tus cartas ganan +1 de ataque este turno.',
+    description: 'Bonus de Espadas: +1 de daño en todos los ataques.',
   },
   copas: {
     voluntadBonus: 0,
-    hpBonus: 3,
-    description: 'Sinergia de Copas: recuperas 3 puntos de vida.',
+    hpBonus: 0,
+    description: 'Bonus de Copas: +1 HP por turno a todas las cartas y purga efectos negativos.',
   },
   oros: {
-    voluntadBonus: 3,
+    voluntadBonus: 1,
     hpBonus: 0,
-    description: 'Sinergia de Oros: ganas 3 de voluntad.',
+    description: 'Bonus de Oros: +1 de voluntad adicional por turno.',
   },
   bastos: {
     voluntadBonus: 0,
     hpBonus: 0,
-    description: 'Sinergia de Bastos: todas tus cartas ganan escudo este turno.',
+    description: 'Bonus de Bastos: -1 de daño recibido a todas las cartas.',
   },
 };
 
