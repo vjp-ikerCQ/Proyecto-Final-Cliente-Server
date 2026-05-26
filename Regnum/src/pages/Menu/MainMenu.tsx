@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import {
   Sword,
   Trophy,
@@ -9,7 +9,8 @@ import {
   LogOut,
   Pen,
   Coins,
-  Wine
+  Wine,
+  Shield
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -19,7 +20,11 @@ import RankingsModal from '../../components/Modal/RankingsModal';
 import GameControls from '../../components/UI/GameControls';
 import FireParticles from '../../components/UI/FireParticles';
 import AtmosphereParticles from '../../components/AtmosphereParticles';
+import BattleTransition from '../../components/UI/BattleTransition';
 import { BarChart2 } from 'lucide-react';
+import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
+import GalleryTransition from '../../components/UI/GalleryTransition';
+import LogoutTransition from '../../components/UI/LogoutTransition';
 
 /**
  * Propiedades para el componente MainMenu
@@ -45,43 +50,65 @@ const CornerDecoration = () => (
  */
 const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
   const { t } = useTranslation();
+  const { playSfx, playMusic } = useSettings();
   // Estados para controlar la visibilidad de los modales
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isRankingsOpen, setIsRankingsOpen] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isGalleryTransitioning, setIsGalleryTransitioning] = useState(false);
+  const [isLogoutTransitioning, setIsLogoutTransitioning] = useState(false);
   
   const navigate = useNavigate();
 
-  // Definición de las opciones del menú principal
-  const menuItems = [
-    { id: 'new-game', text: t('menu.newGame'), icon: <Sword size={20} />, primary: true },
+  useEffect(() => {
+    playMusic(MUSIC_KEYS.MENU);
+  }, []);
+
+  const menuItems = [];
+
+  // El admin no puede jugar, solo gestionar
+  if (user.name !== 'admin') {
+    menuItems.push({ id: 'new-game', text: t('menu.newGame'), icon: <Sword size={20} />, primary: true });
+  }
+
+  menuItems.push(
     { id: 'rankings', text: t('menu.rankings'), icon: <Trophy size={20} />, primary: false },
     { id: 'gallery', text: t('menu.gallery'), icon: <BookOpen size={20} />, primary: false },
     { id: 'settings', text: t('menu.settings'), icon: <Settings size={20} />, primary: false },
-    { id: 'exit', text: t('menu.exit'), icon: <LogOut size={20} />, primary: false },
-  ];
+  );
+
+  if (user.name === 'admin') {
+    // Para el admin, el botón de gestionar es el principal
+    menuItems.push({ id: 'admin', text: 'Admin', icon: <Shield size={20} />, primary: true });
+  }
+
+  menuItems.push({ id: 'exit', text: t('menu.exit'), icon: <LogOut size={20} />, primary: false });
 
   /**
    * Maneja las acciones de cada botón del menú
    */
   const handleAction = (id: string) => {
+    playSfx();
     console.log('Menú - Acción pulsada:', id);
     switch (id) {
       case 'new-game':
-        navigate('/game');
+        setIsTransitioning(true);
         break;
       case 'settings':
         setIsSettingsOpen(true);
         break;
       case 'gallery':
-        navigate('/gallery');
+        setIsGalleryTransitioning(true);
         break;
       case 'rankings':
         setIsRankingsOpen(true);
         break;
+      case 'admin':
+        navigate('/admin');
+        break;
       case 'exit':
-        // Simulación de salida recargando la página
-        window.location.reload();
+        setIsLogoutTransitioning(true);
         break;
       default:
         console.log('Acción no implementada:', id);
@@ -101,7 +128,10 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
       {/* Botón de Estadísticas (Superior Izquierda) */}
       <div className="absolute top-4 left-4 md:top-8 md:left-8 z-20 animate-fade-in-down">
         <button
-          onClick={() => setIsStatsOpen(true)}
+          onClick={() => {
+            playSfx();
+            setIsStatsOpen(true);
+          }}
           className="p-2 md:p-3 border border-accent-gray bg-panel/50 text-primary-gold hover:bg-primary-gold hover:text-bg-main transition-all duration-300 rounded-sm flex items-center gap-2 group shadow-[0_0_15px_rgba(0,0,0,0.5)]"
           title="Ver Estadísticas"
         >
@@ -183,6 +213,18 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
             isOpen={isRankingsOpen}
             onClose={() => setIsRankingsOpen(false)}
           />
+        )}
+
+        {isTransitioning && (
+          <BattleTransition onComplete={() => navigate('/game')} />
+        )}
+
+        {isGalleryTransitioning && (
+          <GalleryTransition onComplete={() => navigate('/gallery')} />
+        )}
+
+        {isLogoutTransitioning && (
+          <LogoutTransition onComplete={() => window.location.reload()} />
         )}
       </AnimatePresence>
     </div>

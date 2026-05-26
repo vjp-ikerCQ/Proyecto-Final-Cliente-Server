@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Volume2, VolumeX, Sun, Moon } from 'lucide-react';
-import { audioService } from '../../services/AudioService';
+import LanguageSelector from './LanguageSelector';
+import { useSettings } from '../../contexts/SettingsContext';
 
 /**
  * Componente que gestiona los controles globales del juego (Sonido, Tema, Idioma).
  * Utiliza localStorage para persistir las preferencias del usuario.
  */
 const GameControls: React.FC = () => {
-  // Inicializa el estado de la música desde el servicio
-  const [isMusicOn, setIsMusicOn] = useState(audioService.isEnabled());
-
+  const { settings, updateSettings, playSfx } = useSettings();
 
   // Inicializa el modo oscuro desde localStorage o por defecto activado
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -31,23 +30,14 @@ const GameControls: React.FC = () => {
     localStorage.setItem('theme-dark', JSON.stringify(isDarkMode));
   }, [isDarkMode]);
 
-  /**
-   * Efecto para guardar la preferencia de música y actualizar el servicio.
-   */
-  useEffect(() => {
-    audioService.setMusicEnabled(isMusicOn);
-  }, [isMusicOn]);
-
-  const toggleMusic = () => {
-    setIsMusicOn(!isMusicOn);
-  };
-
   return (
     <div className="absolute top-8 right-8 flex gap-4 z-10 animate-fade-in-down">
       {/* Botón de Control de Música */}
-      <button
-        onClick={toggleMusic}
-
+      <button 
+        onClick={() => {
+          playSfx();
+          updateSettings({ ...settings, isMusicEnabled: !settings.isMusicEnabled });
+        }}
         className="p-3 border border-accent-gray bg-panel/50 text-primary-gold hover:bg-primary-gold hover:text-bg-main transition-all duration-300 rounded-sm group shadow-[0_0_15px_rgba(0,0,0,0.5)]"
         title="Alternar Música"
       >
@@ -55,8 +45,11 @@ const GameControls: React.FC = () => {
       </button>
 
       {/* Botón de Control de Tema (Oscuro/Claro) */}
-      <button
-        onClick={() => setIsDarkMode(!isDarkMode)}
+      <button 
+        onClick={() => {
+          playSfx();
+          setIsDarkMode(!isDarkMode);
+        }}
         className="p-3 border border-accent-gray bg-panel/50 text-primary-gold hover:bg-primary-gold hover:text-bg-main transition-all duration-300 rounded-sm shadow-[0_0_15px_rgba(0,0,0,0.5)]"
         title="Alternar Modo"
       >
@@ -70,4 +63,3 @@ const GameControls: React.FC = () => {
 };
 
 export default GameControls;
-

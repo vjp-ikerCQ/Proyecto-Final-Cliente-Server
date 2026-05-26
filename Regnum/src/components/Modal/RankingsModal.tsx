@@ -24,7 +24,14 @@ const RankingsModal: React.FC<RankingsModalProps> = ({ isOpen, onClose }) => {
       getRankings()
         .then(data => {
           console.log('Rankings cargados con éxito:', data);
-          setRankings(data);
+          // Excluir al administrador de los rankings y recalcular los puestos de forma consecutiva
+          const filtered = data
+            .filter((entry: RankingEntry) => entry.name?.toLowerCase() !== 'admin')
+            .map((entry: RankingEntry, idx: number) => ({
+              ...entry,
+              rank: idx + 1
+            }));
+          setRankings(filtered);
           setIsLoading(false);
         })
         .catch(err => {

@@ -13,7 +13,16 @@ export interface CardData {
   attackType: string;      // Tipo de ataque (AREA, OBJETIVO, etc.)
   effect: string;          // Descripción del efecto base o habilidad
   image: string;           // Ruta a la imagen de la ilustración
+  maxHealth?: number;      // Vida máxima original de la carta
   keyword?: string;        // Palabra clave (VENENO, VAMPIRO, etc.)
+  descripcion?: string;    // Texto descriptivo visible en la galería
+  playEffect?: string;     // Efecto al entrar al tablero (ej: "start_dmg")
+  playAmount?: number;     // Cantidad asociada al efecto de entrada
+  // --- Estado en juego (runtime) ---
+  shield?: boolean;        // Escudo activo (reduce 1 dmg recibido, desaparece al recibir golpe)
+  poisonTurns?: number;    // Turnos de veneno restantes (1 dmg/turno)
+  bleedTurns?: number;     // Turnos de sangrado restantes (+1 dmg al siguiente golpe recibido)
+  sound?: string;          // Opcional: Ruta al archivo de sonido de la carta
 }
 
 /**
@@ -58,7 +67,7 @@ const generateCards = (): CardData[] => {
       let roleName = roleData.role;
 
       // Personalización por rango y palo según el documento
-      switch(roleData.rank) {
+      switch (roleData.rank) {
         case 1: // AS
           if (suit === 'oros') {
             roleName = 'Dragón Rojo';
@@ -93,8 +102,8 @@ const generateCards = (): CardData[] => {
           effect = `Mucha vida, poco daño elige objetivo${suit === 'oros' ? ' + 1 de voluntad por ataque recibido' : ''}.`;
           break;
         case 5: // CLERIGO
-          attack = 0;
-          effect = 'Da voluntad al usuario.';
+          attack = 1;
+          effect = 'Pasivo: da 1 de voluntad extra al usuario al final de cada ronda.';
           break;
         case 6: // CURANDERO
           attack = 0;
@@ -121,6 +130,11 @@ const generateCards = (): CardData[] => {
           break;
       }
 
+      let soundUrl: string | undefined = undefined;
+      if (suit === 'bastos' && roleData.rank === 11) {
+        soundUrl = 'https://res.cloudinary.com/drvgncidb/video/upload/v1779112084/hog-rider_aopui8.mp3';
+      }
+
       cards.push({
         id: `${suit}-${roleData.rank}`,
         name: `${roleName} de ${suitNames[suit]}`,
@@ -132,7 +146,8 @@ const generateCards = (): CardData[] => {
         health: roleData.hp,
         attackType: roleData.atkType,
         effect: effect,
-        image: `https://res.cloudinary.com/drvgncidb/image/upload/v1/Assets/Folders/Home/regnumhollow/Cards/${suit}_${roleData.rank}.png`
+        image: `https://res.cloudinary.com/drvgncidb/image/upload/v1778854628/Assets/Folders/Home/regnumhollow/Cards/${suit}_${roleData.rank}.png`,
+        sound: soundUrl
       });
     });
   });
@@ -141,32 +156,32 @@ const generateCards = (): CardData[] => {
   for (let i = 1; i <= 3; i++) {
     let effect = '';
     let name = '';
-    switch(i) {
-        case 1: 
-            name = 'Joker de Intercambio';
-            effect = 'Intercambia 2 cartas de tu mano por 2 aleatorias del rival.';
-            break;
-        case 2:
-            name = 'Joker de Retorno';
-            effect = 'Recupera una carta de la mesa para devolverla a la mano.';
-            break;
-        case 3:
-            name = 'Joker de Resurrección';
-            effect = 'Recupera una carta aleatoria de la pila de descartes.';
-            break;
+    switch (i) {
+      case 1:
+        name = 'Joker de Intercambio';
+        effect = 'Intercambia 2 cartas de tu mano por 2 aleatorias del rival.';
+        break;
+      case 2:
+        name = 'Joker de Retorno';
+        effect = 'Recupera una carta de la mesa para devolverla a la mano.';
+        break;
+      case 3:
+        name = 'Joker de Resurrección';
+        effect = 'Recupera una carta aleatoria de la pila de descartes.';
+        break;
     }
     cards.push({
-        id: `joker-${i}`,
-        name: name,
-        suit: 'jokers',
-        rank: i,
-        role: 'JOKER',
-        cost: 1,
-        attack: 0,
-        health: 0,
-        attackType: 'ESPECIAL',
-        effect: effect,
-        image: `https://res.cloudinary.com/drvgncidb/image/upload/v1/Assets/Folders/Home/regnumhollow/Cards/joker_${i}.png`
+      id: `joker-${i}`,
+      name: name,
+      suit: 'jokers',
+      rank: i,
+      role: 'JOKER',
+      cost: 1,
+      attack: 0,
+      health: 0,
+      attackType: 'ESPECIAL',
+      effect: effect,
+      image: `https://res.cloudinary.com/drvgncidb/image/upload/v1778854628/Assets/Folders/Home/regnumhollow/Cards/joker_${i}.png`
     });
   }
 

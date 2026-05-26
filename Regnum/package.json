@@ -13,12 +13,12 @@
     "@cloudinary/react": "^1.14.4",
     "@cloudinary/url-gen": "^1.22.0",
     "framer-motion": "^12.38.0",
-    "i18next": "^26.1.0",
+    "i18next": "^26.2.0",
     "lucide-react": "^1.14.0",
     "phaser": "^4.1.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "react-i18next": "^17.0.7",
+    "react-i18next": "^17.0.8",
     "react-router-dom": "^7.15.0"
   },
   "devDependencies": {

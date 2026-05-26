@@ -6,10 +6,10 @@ import { audioService } from '../../services/AudioService';
 
 const SplashPage: React.FC = () => {
   const navigate = useNavigate();
-  const { playMusic } = useSettings();
+  const { playMusic, playSfx } = useSettings();
 
   const handleStart = () => {
-    audioService.playMusic();
+    playMusic('/audio/menu.mp3');
     navigate('/login');
   };
 

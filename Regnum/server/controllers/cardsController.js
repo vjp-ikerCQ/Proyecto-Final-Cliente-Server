@@ -1,5 +1,16 @@
 const { getDB } = require('../config/db');
 
+const roleByRank = {
+    1: 'AS', 2: 'ASESINO', 3: 'BESTIA', 4: 'TANQUE', 5: 'CLERIGO',
+    6: 'CURANDERO', 7: 'TIRADOR', 8: 'PICARO', 9: 'MAGO',
+    10: 'SOTA', 11: 'CABALLO', 12: 'REY'
+};
+const targetToAttackType = {
+    'area': 'AREA', 'column': 'COLUMNA', 'selected': 'OBJETIVO',
+    'multiple': 'MULTIOBJETIVO', 'player': 'DIRECTO',
+    'ally': 'SOPORTE', 'none': 'SOPORTE'
+};
+
 const getCards = async (req, res) => {
     try {
         const db = getDB();
@@ -38,27 +49,33 @@ const getCards = async (req, res) => {
             let imageUrl = '';
             // Lógica para deducir la ruta de la imagen:
             // Priorizamos la URL de Cloudinary guardada en la BD si existe.
+            const CLOUDINARY_BASE = 'https://res.cloudinary.com/drvgncidb/image/upload/v1778854628/Assets/Folders/Home/regnumhollow/Cards';
             if (carta.image && (carta.image.startsWith('http') || carta.image.startsWith('https'))) {
                 imageUrl = carta.image;
             } else if (paloFormateado === 'jokers' || paloFormateado === 'joker') {
-                imageUrl = `/src/assets/images/cards/joker_${carta.numero}.png`;
+                imageUrl = `${CLOUDINARY_BASE}/joker_${carta.numero}.png`;
             } else {
-                imageUrl = `/src/assets/images/cards/${paloFormateado}_${carta.numero}.png`;
+                imageUrl = `${CLOUDINARY_BASE}/${paloFormateado}_${carta.numero}.png`;
             }
 
             // Adaptamos las propiedades de la BD (español) a las que usa el frontend (inglés)
             return {
-                ...carta, // Mantenemos los datos originales por si acaso
+                ...carta,
                 id: carta._id.toString(),
                 name: carta.nombre,
-                suit: paloFormateado === 'joker' ? 'jokers' : paloFormateado, // El frontend usa 'jokers' en plural
-                role: carta.calidad,
+                suit: paloFormateado === 'joker' ? 'jokers' : paloFormateado,
+                role: roleByRank[carta.numero] || carta.calidad,
                 rank: carta.numero,
                 cost: carta.habilidad?.voluntad || 0,
                 attack: carta.habilidad?.cantidad || 0,
                 health: carta.vida || 0,
+                maxHealth: carta.vida || 0,
+                attackType: targetToAttackType[carta.habilidad?.target] || carta.tipo_ataque || 'OBJETIVO',
                 effect: carta.habilidad?.efecto || '',
-                image: imageUrl
+                keyword: carta.keyword || '',
+                image: carta.imagen_url || imageUrl,
+                playEffect: carta.efecto ?? undefined,
+                playAmount: carta.cantidad_efecto != null ? Number(carta.cantidad_efecto) : undefined
             };
         });
 
@@ -86,6 +103,102 @@ const getCards = async (req, res) => {
     }
 };
 
+const getShuffledDeck = async (req, res) => {
+    try {
+        const db = getDB();
+        
+        if (!db) {
+            console.error('Database not connected');
+            return res.status(503).json({
+                success: false,
+                message: 'El servidor no está conectado a la base de datos'
+            });
+        }
+
+        // Obtener las cartas ordenadas aleatoriamente usando $sample directamente desde MongoDB
+        // Tomamos hasta 100 cartas para asegurarnos de que vienen todas las del mazo
+        const cartas = await db.collection('cartas')
+            .aggregate([{ $sample: { size: 100 } }])
+            .toArray();
+
+        const cartasFormateadas = cartas.map(carta => {
+            const paloFormateado = carta.palo ? carta.palo.toLowerCase() : 'desconocido';
+            const CLOUDINARY_BASE = 'https://res.cloudinary.com/drvgncidb/image/upload/v1778854628/Assets/Folders/Home/regnumhollow/Cards';
+            const imageUrl = paloFormateado === 'jokers' || paloFormateado === 'joker'
+                ? `${CLOUDINARY_BASE}/joker_${carta.numero}.png`
+                : `${CLOUDINARY_BASE}/${paloFormateado}_${carta.numero}.png`;
+
+            return {
+                ...carta,
+                id: carta._id.toString(),
+                name: carta.nombre,
+                suit: paloFormateado === 'joker' ? 'jokers' : paloFormateado,
+                role: roleByRank[carta.numero] || carta.calidad,
+                rank: carta.numero,
+                cost: carta.habilidad?.voluntad || 0,
+                attack: carta.habilidad?.cantidad || 0,
+                health: carta.vida || 0,
+                maxHealth: carta.vida || 0,
+                attackType: targetToAttackType[carta.habilidad?.target] || carta.tipo_ataque || 'OBJETIVO',
+                effect: carta.habilidad?.efecto || '',
+                keyword: carta.keyword || '',
+                image: carta.imagen_url || imageUrl,
+                playEffect: carta.efecto ?? undefined,
+                playAmount: carta.cantidad_efecto != null ? Number(carta.cantidad_efecto) : undefined
+            };
+        });
+
+        return res.json({
+            success: true,
+            count: cartasFormateadas.length,
+            deck: cartasFormateadas
+        });
+
+    } catch (error) {
+        console.error("💥 ERROR EN GET SHUFFLED DECK:", error);
+        return res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+const updateCard = async (req, res) => {
+    try {
+        const db = getDB();
+        const { id } = req.params;
+        const updateData = req.body;
+        const { ObjectId } = require('mongodb');
+
+        let queryId;
+        try {
+            queryId = new ObjectId(id);
+        } catch (e) {
+            queryId = id;
+        }
+
+        // Eliminamos campos que no deben actualizarse en el $set directo
+        delete updateData._id;
+        delete updateData.id;
+
+        const result = await db.collection('cartas').updateOne(
+            { _id: queryId },
+            { $set: updateData }
+        );
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ success: false, message: 'Carta no encontrada' });
+        }
+
+        return res.json({ success: true, message: 'Carta actualizada correctamente' });
+    } catch (error) {
+        console.error("💥 ERROR AL ACTUALIZAR CARTA:", error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+};
+
 module.exports = {
-    getCards
+    getCards,
+    getShuffledDeck,
+    updateCard
 };

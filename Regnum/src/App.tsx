@@ -3,7 +3,9 @@ import { useState, useEffect } from 'react';
 import LoginPage from './pages/Login/LoginPage';
 import MainMenu from './pages/Menu/MainMenu';
 import SplashPage from './pages/Splash/SplashPage';
+import AdminPanel from './pages/Admin/AdminPanel';
 import { SettingsProvider } from './contexts/SettingsContext';
+import SupportButton from './components/SupportButton';
 
 import { testMongoConnection } from './services/mongotest';
 
@@ -49,7 +51,15 @@ function App() {
             <Route 
               path="/menu" 
               element={
-                user ? <MainMenu user={user} /> : <Navigate to="/" />
+                user?.name === 'admin' ? <AdminPanel /> : (user ? <MainMenu user={user} /> : <Navigate to="/" />)
+              } 
+            />
+
+            {/* Admin Route */}
+            <Route 
+              path="/admin" 
+              element={
+                user?.name === 'admin' ? <AdminPanel /> : <Navigate to="/" />
               } 
             />
 
@@ -62,16 +72,17 @@ function App() {
             />
 
             {/* Game Route */}
-            <Route 
-              path="/game" 
+            <Route
+              path="/game"
               element={
-                user ? <Game /> : <Navigate to="/" />
-              } 
+                user ? <Game user={user} /> : <Navigate to="/" />
+              }
             />
 
             {/* Default Redirect to Splash */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
+          {user?.name !== 'admin' && <SupportButton user={user} />}
         </div>
       </Router>
     </SettingsProvider>
