@@ -14,6 +14,7 @@ import { useChat } from './hooks/useChat';
 import { ChatOverlay } from './components/ChatOverlay';
 import { AttackAnimationOverlay } from './components/AttackAnimationOverlay';
 import { JokerAnimationOverlay } from './components/JokerAnimationOverlay';
+import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
 
 const MAX_HP = 30;
 

@@ -188,7 +188,7 @@ class MockCollection {
     this.data = data;
   }
   
-  async find(query = {}, options = {}) {
+  find(query = {}, options = {}) {
     let results = [...this.data];
     if (query.palo) {
       results = results.filter(c => c.palo === query.palo.toLowerCase());
