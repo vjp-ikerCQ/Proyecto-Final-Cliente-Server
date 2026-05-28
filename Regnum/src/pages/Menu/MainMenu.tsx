@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import SettingsModal from '../../components/Modal/SettingsModal';
 import StatsModal from '../../components/Modal/StatsModal';
 import RankingsModal from '../../components/Modal/RankingsModal';
+import DifficultyModal from '../../components/Modal/DifficultyModal';
 import GameControls from '../../components/UI/GameControls';
 import FireParticles from '../../components/UI/FireParticles';
 import AtmosphereParticles from '../../components/AtmosphereParticles';
@@ -50,6 +51,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isRankingsOpen, setIsRankingsOpen] = useState(false);
+  const [isDifficultyOpen, setIsDifficultyOpen] = useState(false);
   
   const navigate = useNavigate();
 
@@ -80,7 +82,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
     console.log('Menú - Acción pulsada:', id);
     switch (id) {
       case 'new-game':
-        navigate('/game');
+        setIsDifficultyOpen(true);
         break;
       case 'settings':
         setIsSettingsOpen(true);
@@ -197,6 +199,13 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
           <RankingsModal
             isOpen={isRankingsOpen}
             onClose={() => setIsRankingsOpen(false)}
+          />
+        )}
+
+        {isDifficultyOpen && (
+          <DifficultyModal
+            isOpen={isDifficultyOpen}
+            onClose={() => setIsDifficultyOpen(false)}
           />
         )}
       </AnimatePresence>
