@@ -70,6 +70,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
     joker3Resurrect,
     joker2Swap,
     moveCaballo,
+    healCardCopa,
   } = gameState;
 
   const { playerSynergy, opponentSynergy } = useSuitSynergy({
@@ -90,6 +91,11 @@ const Game: React.FC<GameProps> = ({ user }) => {
   const [isDragOverDiscard, setIsDragOverDiscard] = useState(false);
   const [gameOver, setGameOver] = useState<'victory' | 'defeat' | null>(null);
   const statsUpdated = useRef(false);
+
+  // Estado del popup del As de Copas
+  const [copaPopupSlot, setCopaPopupSlot] = useState<number | null>(null);
+  const [copaHealSourceSlot, setCopaHealSourceSlot] = useState<number | null>(null);
+  const [copaActedIds, setCopaActedIds] = useState<string[]>([]);
 
   // Estado del popup y movimiento del Caballo
   const [caballoPopupSlot, setCaballoPopupSlot] = useState<number | null>(null);
@@ -275,6 +281,15 @@ useEffect(() => {
   const handlePlayerSlotClick = (slotIndex: number) => {
     const slot = board[slotIndex];
 
+    // ── Fase de curación del As de Copas ──
+    if (copaHealSourceSlot !== null) {
+      if (slot.card) {
+        healCardCopa(slotIndex);
+      }
+      setCopaHealSourceSlot(null);
+      return;
+    }
+
     // ── Fase de movimiento del Caballo ──
     if (caballoMoveSourceSlot !== null) {
       if (Math.abs(slotIndex - caballoMoveSourceSlot) === 1) {
@@ -341,6 +356,14 @@ useEffect(() => {
 
       if (!isPlayerTurn) return;
 
+      // As de Copas: mostrar popup atacar/curar
+      if (slot.card && slot.card.rank === 1 && slot.card.suit === 'copas') {
+        setCopaPopupSlot(prev => prev === slotIndex ? null : slotIndex);
+        setSelectedAttackerIndex(null);
+        setSelectedHandCardIndex(null);
+        return;
+      }
+
       // Caballo: mostrar popup de acción en vez de seleccionar directamente
       if (slot.card && slot.card.role.toUpperCase() === 'CABALLO') {
         setCaballoPopupSlot(prev => prev === slotIndex ? null : slotIndex);
@@ -397,6 +420,9 @@ useEffect(() => {
     setCaballoPopupSlot(null);
     setCaballoMoveSourceSlot(null);
     setCaballoMovedIds([]);
+    setCopaPopupSlot(null);
+    setCopaHealSourceSlot(null);
+    setCopaActedIds([]);
     initializeGame();
   };
 
@@ -509,6 +535,9 @@ useEffect(() => {
     setCaballoPopupSlot(null);
     setCaballoMoveSourceSlot(null);
     setCaballoMovedIds([]);
+    setCopaPopupSlot(null);
+    setCopaHealSourceSlot(null);
+    setCopaActedIds([]);
   };
 
   const handleOpponentHandCardClick = (i: number) => {
@@ -810,7 +839,7 @@ useEffect(() => {
               id={`player-board-slot-${i}`}
               slot={slot}
               onSelect={setViewingCard}
-              isAttacking={selectedAttackerIndex === i || caballoPopupSlot === i}
+              isAttacking={selectedAttackerIndex === i || caballoPopupSlot === i || copaPopupSlot === i}
               hasAttacked={gameState.playerAttackedIndices.includes(i)}
               isActiveToPlay={selectedHandCardIndex !== null && !slot.card && !selectedIsJoker && canAffordSelected && joker2Phase === null && caballoMoveSourceSlot === null}
               isActiveToHeal={isAlliedSlotActiveToHeal(i)}
@@ -824,6 +853,7 @@ useEffect(() => {
                 i !== caballoMoveSourceSlot &&
                 Math.abs(i - caballoMoveSourceSlot) === 1
               }
+              isActiveForCopaHeal={copaHealSourceSlot !== null && !!slot.card}
               onClick={() => handlePlayerSlotClick(i)}
               synergyGlow={playerSynergy.isActive ? playerSynergy.suit : null}
             />
@@ -1000,6 +1030,72 @@ useEffect(() => {
           sendMessage={sendMessage}
           toggleChat={toggleChat}
         />
+      {/* POPUP AS DE COPAS */}
+      <AnimatePresence>
+        {copaPopupSlot !== null && (() => {
+          const copaSlot = board[copaPopupSlot];
+          const hasActed = copaSlot.card ? copaActedIds.includes(copaSlot.card.id) : true;
+          const hasAttacked = gameState.playerAttackedIndices.includes(copaPopupSlot);
+          const blocked = hasActed || hasAttacked;
+          return (
+            <motion.div
+              key="copa-popup"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[95] flex items-center justify-center"
+              onClick={() => setCopaPopupSlot(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.85, y: 10 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.85, y: 10 }}
+                className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-5 shadow-2xl flex flex-col gap-3 min-w-[200px]"
+                onClick={e => e.stopPropagation()}
+              >
+                <span className="text-[9px] uppercase tracking-[0.4em] text-[#00ccff] text-center font-cinzel">As de Copas</span>
+                <button
+                  disabled={blocked}
+                  onClick={() => {
+                    setCopaPopupSlot(null);
+                    setSelectedAttackerIndex(copaPopupSlot);
+                  }}
+                  className={`py-2.5 px-4 rounded-lg border text-[11px] font-black uppercase tracking-widest transition-all ${
+                    blocked
+                      ? 'opacity-30 cursor-not-allowed border-white/10 text-white/30'
+                      : 'border-red-500/60 text-red-400 hover:bg-red-950/40 cursor-pointer'
+                  }`}
+                >
+                  ⚔ Atacar
+                </button>
+                <button
+                  disabled={blocked}
+                  onClick={() => {
+                    const card = board[copaPopupSlot!].card;
+                    if (card) setCopaActedIds(prev => [...prev, card.id]);
+                    setCopaHealSourceSlot(copaPopupSlot);
+                    setCopaPopupSlot(null);
+                  }}
+                  className={`py-2.5 px-4 rounded-lg border text-[11px] font-black uppercase tracking-widest transition-all ${
+                    blocked
+                      ? 'opacity-30 cursor-not-allowed border-white/10 text-white/30'
+                      : 'border-emerald-400/60 text-emerald-300 hover:bg-emerald-950/40 cursor-pointer'
+                  }`}
+                >
+                  ✦ Curar
+                </button>
+                <button
+                  onClick={() => setCopaPopupSlot(null)}
+                  className="text-[9px] text-gray-600 hover:text-gray-400 uppercase tracking-widest pt-1"
+                >
+                  Cancelar
+                </button>
+              </motion.div>
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
+
       {/* POPUP CABALLO */}
       <AnimatePresence>
         {caballoPopupSlot !== null && (() => {
@@ -1094,20 +1190,31 @@ useEffect(() => {
                   </div>
                 </div>
                 <div className="flex justify-center md:justify-start gap-4">
-                  {viewingCard.suit !== 'jokers' && (
-                    <>
-                      <div className="flex flex-col items-center gap-1">
-                        <span className="text-[9px] uppercase tracking-widest text-accent-gray">Ataque</span>
-                        <span className="text-xl font-bold text-red-400">{viewingCard.attack}</span>
-                      </div>
-                      <div className="w-px bg-white/10" />
-                      <div className="flex flex-col items-center gap-1">
-                        <span className="text-[9px] uppercase tracking-widest text-accent-gray">Vida</span>
-                        <span className="text-xl font-bold text-green-400">{viewingCard.health}</span>
-                      </div>
-                      <div className="w-px bg-white/10" />
-                    </>
-                  )}
+                  {viewingCard.suit !== 'jokers' && (() => {
+                    const baseAtk = viewingCard.attack;
+                    const bonus = viewingCard.ladderBonus || 0;
+                    const currentAtk = typeof baseAtk === 'number' ? baseAtk + bonus : baseAtk;
+                    const maxHp = viewingCard.maxHealth ?? viewingCard.health;
+                    return (
+                      <>
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="text-[9px] uppercase tracking-widest text-accent-gray">Ataque</span>
+                          <span className="text-xl font-bold text-red-400">
+                            {bonus > 0 ? `${currentAtk}` : `${baseAtk}`}
+                          </span>
+                          {bonus > 0 && (
+                            <span className="text-[9px] text-red-300/60">(base {baseAtk})</span>
+                          )}
+                        </div>
+                        <div className="w-px bg-white/10" />
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="text-[9px] uppercase tracking-widest text-accent-gray">Vida</span>
+                          <span className="text-xl font-bold text-green-400">{viewingCard.health}<span className="text-sm text-green-600">/{maxHp}</span></span>
+                        </div>
+                        <div className="w-px bg-white/10" />
+                      </>
+                    );
+                  })()}
                   <div className="flex flex-col items-center gap-1">
                     <span className="text-[9px] uppercase tracking-widest text-accent-gray">Coste</span>
                     <span className="text-xl font-bold text-blue-400">{viewingCard.cost}</span>
@@ -1381,9 +1488,10 @@ const BoardSlotView: React.FC<{
   isActiveToStack?: boolean;
   isJoker2Target?: boolean;
   isActiveForCaballoMove?: boolean;
+  isActiveForCopaHeal?: boolean;
   onClick?: () => void;
   synergyGlow?: string | null;
-}> = ({ slot, id, isOpponent: _isOpponent, onSelect, isActiveToPlay, isAttacking, hasAttacked, isActiveToAttack, isActiveToHeal, isActiveToStack, isJoker2Target, isActiveForCaballoMove, onClick, synergyGlow }) => {
+}> = ({ slot, id, isOpponent: _isOpponent, onSelect, isActiveToPlay, isAttacking, hasAttacked, isActiveToAttack, isActiveToHeal, isActiveToStack, isJoker2Target, isActiveForCaballoMove, isActiveForCopaHeal, onClick, synergyGlow }) => {
   return (
     <div
       id={id}
@@ -1404,7 +1512,9 @@ const BoardSlotView: React.FC<{
                     : isActiveToStack
                       ? 'border-amber-500 bg-amber-500/10 animate-pulse cursor-pointer shadow-[0_0_20px_rgba(251,191,36,0.5)] z-30'
                       : 'border-white/5 bg-white/[0.01]'
-          : isActiveForCaballoMove
+          : isActiveForCopaHeal
+            ? 'border-emerald-400 bg-emerald-400/10 animate-pulse cursor-pointer shadow-[0_0_20px_rgba(52,211,153,0.4)] z-30'
+            : isActiveForCaballoMove
             ? 'border-orange-400 bg-orange-400/10 animate-pulse cursor-pointer shadow-[0_0_20px_rgba(251,146,60,0.4)] z-30'
             : isActiveToPlay
             ? 'border-primary-gold bg-primary-gold/10 animate-pulse cursor-pointer shadow-lg'
