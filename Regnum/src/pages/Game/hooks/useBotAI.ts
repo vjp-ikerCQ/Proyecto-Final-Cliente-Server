@@ -3,6 +3,7 @@ import { type CardData } from '../../../utils/cardData';
 import { type BoardSlot } from './useGameState';
 
 interface BotAIOptions {
+  difficulty?: 'normal' | 'hard';
   isPlayerTurn: boolean;
   isLoading: boolean;
   opponentVoluntad: number;
@@ -29,7 +30,12 @@ interface BotAIOptions {
   opponentMagoAttacks: Record<number, number[]>;
 }
 
-export const evaluateTargetScore = (attackerCard: CardData, targetCard: CardData | null): number => {
+export const evaluateTargetScore = (attackerCard: CardData, targetCard: CardData | null, difficulty: 'normal' | 'hard' = 'hard'): number => {
+  if (difficulty === 'normal') {
+    // Comportamiento aleatorio/menos óptimo en dificultad normal
+    return Math.random() * 50;
+  }
+
   let score = 0;
 
   if (!targetCard) {
@@ -75,6 +81,7 @@ export const evaluateTargetScore = (attackerCard: CardData, targetCard: CardData
 };
 
 export const useBotAI = ({
+  difficulty = 'hard',
   isPlayerTurn,
   isLoading,
   opponentVoluntad,
@@ -116,22 +123,24 @@ export const useBotAI = ({
     const timer = setTimeout(() => {
       let actionTaken = false;
 
-      // 0. Ahorro de Voluntad
+      // 0. Ahorro de Voluntad (Solo en modo Difícil)
       let savingWillpower = false;
-      for (let i = 0; i < 3; i++) {
-        const slot = opponentBoard[i];
-        if (!slot.card) continue;
-        if (opponentAttackedIndices.includes(i)) continue;
-        
-        const card = slot.card;
-        const isMago = card.role.toUpperCase() === 'MAGO';
-        const magoAttacks = opponentMagoAttacks[i] || [];
-        const hasAttackedOnce = isMago && magoAttacks.length > 0;
-        
-        // Si no ha atacado y no tenemos voluntad para pagar su ataque, queremos ahorrar
-        if (!hasAttackedOnce && opponentVoluntad < card.cost) {
-          savingWillpower = true;
-          break;
+      if (difficulty === 'hard') {
+        for (let i = 0; i < 3; i++) {
+          const slot = opponentBoard[i];
+          if (!slot.card) continue;
+          if (opponentAttackedIndices.includes(i)) continue;
+          
+          const card = slot.card;
+          const isMago = card.role.toUpperCase() === 'MAGO';
+          const magoAttacks = opponentMagoAttacks[i] || [];
+          const hasAttackedOnce = isMago && magoAttacks.length > 0;
+          
+          // Si no ha atacado y no tenemos voluntad para pagar su ataque, queremos ahorrar
+          if (!hasAttackedOnce && opponentVoluntad < card.cost) {
+            savingWillpower = true;
+            break;
+          }
         }
       }
 
@@ -159,8 +168,8 @@ export const useBotAI = ({
       }
 
       // 2b. Escaleras: apilar carta si el rango siguiente está en la mano
-      // Se permite hacer escaleras incluso ahorrando voluntad porque son gratis.
-      if (!actionTaken) {
+      // Se permite hacer escaleras incluso ahorrando voluntad porque son gratis. (Solo en Difícil)
+      if (!actionTaken && difficulty === 'hard') {
         for (let i = 0; i < 3; i++) {
           const topCard = opponentBoard[i].card;
           if (topCard && topCard.rank < 12) {
@@ -194,23 +203,38 @@ export const useBotAI = ({
              // Curación inteligente
              let bestTarget = -1;
              let maxScore = -1;
-             for (let j = 0; j < 3; j++) {
-               if (i !== j && opponentBoard[j].card) {
-                 const ally = opponentBoard[j].card!;
-                 const maxHp = ally.maxHealth ?? 5; // Valor seguro por defecto
-                 if (ally.health < maxHp) {
-                   let allyScore = 0;
-                   const role = ally.role.toUpperCase();
-                   if (['REY', 'AS', 'TIRADOR', 'MAGO', 'ASESINO', 'CABALLO'].includes(role)) allyScore += 30;
-                   else if (['CLERIGO', 'CURANDERO'].includes(role)) allyScore += 15;
-                   else allyScore += 5;
-                   
-                   // Prioridad a cartas cerca de la muerte
-                   if (ally.health <= 3) allyScore += 20;
-
-                   if (allyScore > maxScore) {
-                     maxScore = allyScore;
+             
+             if (difficulty === 'normal') {
+               // En normal, cura a la primera carta que vea herida
+               for (let j = 0; j < 3; j++) {
+                 if (i !== j && opponentBoard[j].card) {
+                   const ally = opponentBoard[j].card!;
+                   const maxHp = ally.maxHealth ?? 5;
+                   if (ally.health < maxHp) {
                      bestTarget = j;
+                     break;
+                   }
+                 }
+               }
+             } else {
+               for (let j = 0; j < 3; j++) {
+                 if (i !== j && opponentBoard[j].card) {
+                   const ally = opponentBoard[j].card!;
+                   const maxHp = ally.maxHealth ?? 5; // Valor seguro por defecto
+                   if (ally.health < maxHp) {
+                     let allyScore = 0;
+                     const role = ally.role.toUpperCase();
+                     if (['REY', 'AS', 'TIRADOR', 'MAGO', 'ASESINO', 'CABALLO'].includes(role)) allyScore += 30;
+                     else if (['CLERIGO', 'CURANDERO'].includes(role)) allyScore += 15;
+                     else allyScore += 5;
+                     
+                     // Prioridad a cartas cerca de la muerte
+                     if (ally.health <= 3) allyScore += 20;
+  
+                     if (allyScore > maxScore) {
+                       maxScore = allyScore;
+                       bestTarget = j;
+                     }
                    }
                  }
                }
@@ -264,7 +288,7 @@ export const useBotAI = ({
 
             for (const targetIdx of validTargets) {
                const targetCard = board[targetIdx].card!;
-               const score = evaluateTargetScore(card, targetCard);
+               const score = evaluateTargetScore(card, targetCard, difficulty);
                if (score > maxScore) {
                  maxScore = score;
                  bestTarget = targetIdx;
@@ -272,7 +296,7 @@ export const useBotAI = ({
             }
 
             if (canAttackDir) {
-               const dirScore = evaluateTargetScore(card, null);
+               const dirScore = evaluateTargetScore(card, null, difficulty);
                if (dirScore > maxScore) {
                  bestTarget = -1; // -1 significa ataque directo al jugador
                  maxScore = dirScore;
@@ -314,13 +338,14 @@ export const useBotAI = ({
         endTurn(false);
       }
 
-    }, 800); // 800ms de pausa entre acciones del bot
+    }, difficulty === 'hard' ? 800 : 1500); // 800ms Difícil, 1500ms Normal
 
     return () => {
       clearTimeout(timer);
       isExecutingRef.current = false;
     };
   }, [
+    difficulty,
     isPlayerTurn,
     isLoading,
     opponentHand,

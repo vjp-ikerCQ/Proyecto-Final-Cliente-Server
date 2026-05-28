@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Shield, Swords, ArrowLeft } from 'lucide-react';
 import backCardImage from '../../assets/images/backCard.png';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { type CardData } from '../../utils/cardData';
 import { useGameState, type BoardSlot } from './hooks/useGameState';
 import { useBotAI } from './hooks/useBotAI';
@@ -34,6 +34,8 @@ interface GameProps {
 
 const Game: React.FC<GameProps> = ({ user }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const difficulty = location.state?.difficulty || 'hard'; // Por defecto hard para compatibilidad
 
   // Custom Hooks para estado y bot
   const gameState = useGameState();
@@ -177,6 +179,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
   };
 
   useBotAI({
+    difficulty,
     isPlayerTurn,
     isLoading,
     opponentVoluntad,
