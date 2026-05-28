@@ -623,10 +623,10 @@ useEffect(() => {
       if (hasMagoAttackedTarget(true, selectedAttackerIndex, slotIndex)) return false;
     }
 
-    // Solo asesino, tanque, tirador, pícaro, mago y sota pueden elegir a qué carta pegar
+    const isAs = attackerCard.rank === 1;
     const TARGETING_ROLES = ['ASESINO', 'TANQUE', 'TIRADOR', 'PICARO', 'MAGO', 'SOTA'];
-    if (!TARGETING_ROLES.includes(attackerCard.role.toUpperCase())) {
-      // Si no es un rol de target, solo puede pegar a su propia columna vertical
+    if (!TARGETING_ROLES.includes(attackerCard.role.toUpperCase()) && !isAs) {
+      // Si no es un rol de target y no es un AS, solo puede pegar a su propia columna vertical
       if (selectedAttackerIndex !== slotIndex) return false;
     }
 

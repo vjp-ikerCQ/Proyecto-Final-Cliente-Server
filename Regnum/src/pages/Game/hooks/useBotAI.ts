@@ -251,8 +251,9 @@ export const useBotAI = ({
           if (card.attackType !== 'SOPORTE') {
             let canAttackDir = false;
             let validTargets: number[] = [];
+            const isAs = card.rank === 1;
             const TARGETING_ROLES = ['ASESINO', 'TANQUE', 'TIRADOR', 'PICARO', 'SOTA'];
-            const isTargeting = TARGETING_ROLES.includes(card.role.toUpperCase()) || isMago;
+            const isTargeting = TARGETING_ROLES.includes(card.role.toUpperCase()) || isMago || isAs;
             const hasPlayerCards = board.some(s => s.card);
 
             if (isMago) {
