@@ -3,7 +3,6 @@ import { User, Lock, Scale, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import RegisterModal from '../../components/Modal/RegisterModal';
 import GameControls from '../../components/UI/GameControls';
-import { useSettings } from '../../contexts/SettingsContext';
 
 interface LoginPageProps {
   onLogin: (name: string, isGuest: boolean) => void;
@@ -11,7 +10,6 @@ interface LoginPageProps {
 
 const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const { t } = useTranslation();
-  const { playSfx } = useSettings();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -36,14 +34,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   };
 
   const handleGuestEntry = () => {
-    playSfx();
     triggerFullscreen();
     onLogin('Invitado', true);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    playSfx();
     setError(null);
     setBannedUser('');
     
@@ -256,10 +252,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
         <div className="mt-4 md:mt-8 text-center">
           <button
-            onClick={() => {
-              playSfx();
-              setIsRegisterOpen(true);
-            }}
+            onClick={() => setIsRegisterOpen(true)}
             className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest text-gray-500 hover:text-primary-gold transition-all"
           >
             {t('login.register')} <span className="font-bold border-b border-primary-gold/30 ml-1">{t('login.registerLink')}</span>

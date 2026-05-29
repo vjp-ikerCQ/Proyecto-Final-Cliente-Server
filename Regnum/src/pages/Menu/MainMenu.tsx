@@ -17,12 +17,14 @@ import { useNavigate } from 'react-router-dom';
 import SettingsModal from '../../components/Modal/SettingsModal';
 import StatsModal from '../../components/Modal/StatsModal';
 import RankingsModal from '../../components/Modal/RankingsModal';
+import DifficultyModal from '../../components/Modal/DifficultyModal';
 import GameControls from '../../components/UI/GameControls';
 import FireParticles from '../../components/UI/FireParticles';
 import AtmosphereParticles from '../../components/AtmosphereParticles';
-import BattleTransition from '../../components/UI/BattleTransition';
 import { BarChart2 } from 'lucide-react';
+
 import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
+import BattleTransition from '../../components/UI/BattleTransition';
 import GalleryTransition from '../../components/UI/GalleryTransition';
 import LogoutTransition from '../../components/UI/LogoutTransition';
 
@@ -50,20 +52,26 @@ const CornerDecoration = () => (
  */
 const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
   const { t } = useTranslation();
-  const { playSfx, playMusic } = useSettings();
+  const { playMusic, playSfx } = useSettings();
+  
   // Estados para controlar la visibilidad de los modales
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isRankingsOpen, setIsRankingsOpen] = useState(false);
+  const [isDifficultyOpen, setIsDifficultyOpen] = useState(false);
+
+  // Estados de animaciones de transición
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isGalleryTransitioning, setIsGalleryTransitioning] = useState(false);
   const [isLogoutTransitioning, setIsLogoutTransitioning] = useState(false);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<'normal' | 'hard'>('hard');
   
   const navigate = useNavigate();
 
+  // Reproducir música del menú al montar
   useEffect(() => {
     playMusic(MUSIC_KEYS.MENU);
-  }, []);
+  }, [playMusic]);
 
   const menuItems = [];
 
@@ -85,6 +93,11 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
 
   menuItems.push({ id: 'exit', text: t('menu.exit'), icon: <LogOut size={20} />, primary: false });
 
+  const handleDifficultySelect = (difficulty: 'normal' | 'hard') => {
+    setSelectedDifficulty(difficulty);
+    setIsTransitioning(true);
+  };
+
   /**
    * Maneja las acciones de cada botón del menú
    */
@@ -93,7 +106,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
     console.log('Menú - Acción pulsada:', id);
     switch (id) {
       case 'new-game':
-        setIsTransitioning(true);
+        setIsDifficultyOpen(true);
         break;
       case 'settings':
         setIsSettingsOpen(true);
@@ -215,8 +228,16 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
           />
         )}
 
+        {isDifficultyOpen && (
+          <DifficultyModal
+            isOpen={isDifficultyOpen}
+            onClose={() => setIsDifficultyOpen(false)}
+            onSelectDifficulty={handleDifficultySelect}
+          />
+        )}
+
         {isTransitioning && (
-          <BattleTransition onComplete={() => navigate('/game')} />
+          <BattleTransition onComplete={() => navigate('/game', { state: { difficulty: selectedDifficulty } })} />
         )}
 
         {isGalleryTransitioning && (
@@ -232,3 +253,4 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
 };
 
 export default MainMenu;
+

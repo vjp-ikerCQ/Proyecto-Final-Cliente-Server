@@ -3,28 +3,27 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../../contexts/SettingsContext';
 
+const SPLASH_MUSIC_URL = 'https://res.cloudinary.com/drvgncidb/video/upload/Assets/Folders/Home/regnumhollow/splash2.mp3';
 
 const SplashPage: React.FC = () => {
   const navigate = useNavigate();
-  const { playMusic } = useSettings();
+  const { playMusic, stopMusic } = useSettings();
 
+  // Play splash music after 250ms delay
   useEffect(() => {
     const timer = setTimeout(() => {
-      // Play splash2 music from Cloudinary
-      playMusic('https://res.cloudinary.com/drvgncidb/video/upload/v1778854628/Assets/Folders/Home/regnumhollow/background/splash2.mp3');
-    }, 250); // 0.25 seconds delay
-
+      playMusic(SPLASH_MUSIC_URL);
+    }, 250);
     return () => clearTimeout(timer);
   }, [playMusic]);
 
   const handleStart = () => {
-    playMusic('/audio/menu.mp3');
+    stopMusic();
     navigate('/login');
   };
 
-
   return (
-    <motion.div
+    <motion.div 
       className="relative h-screen w-screen flex flex-col items-center justify-center overflow-hidden cursor-pointer bg-black"
       onClick={handleStart}
       initial={{ opacity: 0 }}
@@ -33,14 +32,14 @@ const SplashPage: React.FC = () => {
       transition={{ duration: 1.5 }}
     >
       {/* Background Image with Overlay */}
-      <div
+      <div 
         className="absolute inset-0 bg-cover bg-center transition-transform duration-[10000ms] ease-out scale-110 hover:scale-100"
-        style={{
+        style={{ 
           backgroundImage: `url('/splash_background.png')`,
           filter: 'brightness(0.4) contrast(1.2)'
         }}
       />
-
+      
       {/* Vignette effect */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_20%,rgba(0,0,0,0.8)_100%)]" />
 

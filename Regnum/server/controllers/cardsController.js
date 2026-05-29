@@ -52,12 +52,10 @@ const getCards = async (req, res) => {
         const cartasFormateadas = cartas.map(carta => {
             const paloFormateado = carta.palo ? carta.palo.toLowerCase() : 'desconocido';
             let imageUrl = '';
-            // Lógica para deducir la ruta de la imagen:
-            // Priorizamos la URL de Cloudinary guardada en la BD si existe.
+
+            // Lógica para deducir la ruta de la imagen
             const CLOUDINARY_BASE = 'https://res.cloudinary.com/drvgncidb/image/upload/v1778854628/Assets/Folders/Home/regnumhollow/Cards';
-            if (carta.image && (carta.image.startsWith('http') || carta.image.startsWith('https'))) {
-                imageUrl = carta.image;
-            } else if (paloFormateado === 'jokers' || paloFormateado === 'joker') {
+            if (paloFormateado === 'jokers' || paloFormateado === 'joker') {
                 imageUrl = `${CLOUDINARY_BASE}/joker_${carta.numero}.png`;
             } else {
                 imageUrl = `${CLOUDINARY_BASE}/${paloFormateado}_${carta.numero}.png`;

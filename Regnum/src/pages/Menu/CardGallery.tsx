@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, X, ChevronLeft, ChevronRight, Volume2 } from 'lucide-react';
+import { ArrowLeft, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { type CardData } from '../../utils/cardData';
-import { useSettings, SFX_KEYS } from '../../contexts/SettingsContext';
 import { fetchCards } from '../../services/cardsService';
 
 /**
@@ -15,15 +14,6 @@ const suitColors = {
   oros: '#ffcc00',
   bastos: '#00ff66',
   jokers: '#a855f7',
-};
-
-const tabDescriptions: Record<string, string> = {
-  TODAS: 'Explora la colección completa del Reino de Regnum. Visualiza todos los palos (Espadas, Copas, Oros, Bastos) y los poderosos Jokers.',
-  ESPADAS: 'El palo de la guerra y la fuerza. Las Espadas se especializan en hacer daño masivo de cruz e individual para diezmar las líneas enemigas.',
-  COPAS: 'El palo del misticismo y la curación. Las Copas controlan el campo de batalla restaurando salud a sus aliados y envenenando a los oponentes.',
-  OROS: 'El palo de la riqueza y la abundancia. Los Oros manipulan la Voluntad (maná), otorgando recursos adicionales al jugar o resolver sus habilidades.',
-  BASTOS: 'El palo del impacto y la defensa física. Los Bastos infligen daño colosal en área y aumentan la resistencia reduciendo el daño recibido.',
-  JOKERS: 'Comodines legendarios con efectos mágicos. Los Jokers no poseen estadísticas de combate directas, pero alteran el flujo del juego drásticamente.',
 };
 
 
@@ -88,47 +78,9 @@ const CardTile: React.FC<{ card: CardData; onClick: () => void }> = ({ card, onC
  */
 const CardGallery: React.FC = () => {
   const navigate = useNavigate();
-  const { settings } = useSettings();
   const [activeTab, setActiveTab] = useState<'TODAS' | 'ESPADAS' | 'COPAS' | 'OROS' | 'BASTOS' | 'JOKERS'>('TODAS');
   const [selectedCard, setSelectedCard] = useState<CardData | null>(null);
   const [cards, setCards] = useState<CardData[]>([]);
-
-  // Referencia para pausar/reiniciar el audio activo de la galería
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Detener el sonido al cambiar de carta o cerrar la vista modal
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-        audioRef.current = null;
-      }
-    };
-  }, [selectedCard]);
-
-  const playCardSound = useCallback((soundUrl?: string) => {
-    // Si hay un audio en reproducción, lo detenemos primero
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
-
-    if (!settings.isSfxEnabled) return;
-
-    const sfxSrc = soundUrl || SFX_KEYS.CLICK;
-    const audio = new Audio(sfxSrc);
-    audio.volume = settings.sfxVolume;
-    audioRef.current = audio;
-
-    audio.play().catch(err => console.log("SFX play blocked by browser:", err));
-
-    audio.onended = () => {
-      if (audioRef.current === audio) {
-        audioRef.current = null;
-      }
-    };
-  }, [settings.isSfxEnabled, settings.sfxVolume]);
 
   useEffect(() => {
     fetchCards().then(setCards).catch(console.error);
@@ -224,28 +176,6 @@ const CardGallery: React.FC = () => {
         ))}
       </nav>
 
-      {/* Breve descripción/ayuda de la categoría seleccionada */}
-      <div className="relative z-10 max-w-2xl mx-auto -mt-8 mb-16 text-center px-4">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.3 }}
-            className="p-4 rounded-xl border bg-panel-secondary/40 backdrop-blur-sm shadow-[0_0_20px_rgba(166,138,100,0.02)]"
-            style={{ borderColor: activeTab === 'TODAS' ? 'rgba(166,138,100,0.2)' : `${suitColors[activeTab.toLowerCase() as keyof typeof suitColors]}25` }}
-          >
-            <p className="text-[10px] md:text-xs uppercase tracking-[0.2em] font-spectral font-black mb-1.5" style={{ color: activeTab === 'TODAS' ? '#a68a64' : suitColors[activeTab.toLowerCase() as keyof typeof suitColors] }}>
-              {activeTab === 'TODAS' ? 'Colección General' : `Palo de ${activeTab}`}
-            </p>
-            <p className="text-xs md:text-sm text-gray-400 font-light italic leading-relaxed tracking-wider">
-              {tabDescriptions[activeTab]}
-            </p>
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
       {/* Cuadrícula de Cartas (no-jokers) */}
       <main className="relative z-10 max-w-7xl mx-auto px-2 md:px-0 pb-20 space-y-6">
         
@@ -331,26 +261,14 @@ const CardGallery: React.FC = () => {
 
               {/* Información Detallada */}
               <div className="flex-1 space-y-6 md:space-y-10 text-center md:text-left py-4 md:py-10">
-                <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="text-center md:text-left">
-                    <span className="text-[8px] md:text-[10px] uppercase tracking-[0.5em] text-primary-gold mb-1 block font-spectral font-black">
-                      {selectedCard.suit} / {selectedCard.role}
-                    </span>
-                    <h2 className="text-2xl sm:text-4xl md:text-6xl font-black text-text-main uppercase tracking-tighter leading-none mb-2">
-                      {selectedCard.name}
-                    </h2>
-                    <div className="h-1 w-20 md:w-40 bg-primary-gold mx-auto md:mx-0" />
-                  </div>
-
-                  <motion.button
-                    whileHover={{ scale: 1.1, boxShadow: '0 0 20px rgba(166, 138, 100, 0.6)' }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => playCardSound(selectedCard.sound)}
-                    className="flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-full border-2 border-primary-gold bg-bg-main/80 text-primary-gold hover:bg-primary-gold hover:text-bg-main transition-colors shadow-[0_0_15px_rgba(166,138,100,0.2)] shrink-0 self-center md:self-auto"
-                    title="Reproducir sonido"
-                  >
-                    <Volume2 size={24} className="md:w-7 md:h-7 animate-pulse" />
-                  </motion.button>
+                <div className="relative">
+                  <span className="text-[8px] md:text-[10px] uppercase tracking-[0.5em] text-primary-gold mb-1 block font-spectral font-black">
+                    {selectedCard.suit} / {selectedCard.role}
+                  </span>
+                  <h2 className="text-2xl sm:text-4xl md:text-6xl font-black text-text-main uppercase tracking-tighter leading-none mb-2">
+                    {selectedCard.name}
+                  </h2>
+                  <div className="h-1 w-20 md:w-40 bg-primary-gold mx-auto md:mx-0" />
                 </div>
 
                 {selectedCard.suit !== 'jokers' && (

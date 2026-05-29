@@ -15,7 +15,7 @@ interface SettingsModalProps {
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const { settings, updateSettings, saveSettings, revertSettings, playSfx } = useSettings();
+  const { settings, updateSettings, saveSettings, revertSettings } = useSettings();
   
   // Keep track of settings when the modal was opened
   const originalSettings = useRef<GameSettings>(settings);
@@ -32,7 +32,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   }, [isOpen]);
 
   const handleBack = () => {
-    playSfx();
     if (!hasSaved.current) {
       revertSettings(originalSettings.current);
     }
@@ -40,7 +39,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   };
 
   const handleSave = () => {
-    playSfx();
     saveSettings();
     hasSaved.current = true;
     setShowSuccess(true);
@@ -51,7 +49,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   };
 
   const handleRestore = () => {
-    playSfx();
     const DEFAULT_SETTINGS: GameSettings = {
       musicVolume: 0.5,
       sfxVolume: 0.5,
@@ -150,10 +147,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                       </div>
                       <Toggle 
                         checked={settings.isSfxEnabled} 
-                        onChange={() => {
-                          playSfx();
-                          updateSettings({ ...settings, isSfxEnabled: !settings.isSfxEnabled });
-                        }} 
+                        onChange={() => updateSettings({ ...settings, isSfxEnabled: !settings.isSfxEnabled })} 
                       />
                     </div>
 
@@ -164,10 +158,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                       </div>
                       <Toggle 
                         checked={settings.isMusicEnabled} 
-                        onChange={() => {
-                          playSfx();
-                          updateSettings({ ...settings, isMusicEnabled: !settings.isMusicEnabled });
-                        }} 
+                        onChange={() => updateSettings({ ...settings, isMusicEnabled: !settings.isMusicEnabled })} 
                       />
                     </div>
                   </div>
@@ -182,10 +173,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                       <div className="relative">
                         <select 
                           value={settings.animQuality}
-                          onChange={(e) => {
-                            playSfx();
-                            updateSettings({ ...settings, animQuality: e.target.value as any });
-                          }}
+                          onChange={(e) => updateSettings({ ...settings, animQuality: e.target.value as any })}
                           className="appearance-none bg-secondary-gray border border-accent-gray text-gray-300 text-xs py-2 px-8 font-cinzel focus:outline-none focus:border-primary-gold cursor-pointer"
                         >
                           <option value="Baja">Baja</option>
@@ -199,10 +187,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                       <span className="text-sm text-gray-400">Efectos de Partículas</span>
                       <Toggle 
                         checked={settings.particlesEnabled} 
-                        onChange={() => {
-                          playSfx();
-                          updateSettings({ ...settings, particlesEnabled: !settings.particlesEnabled });
-                        }} 
+                        onChange={() => updateSettings({ ...settings, particlesEnabled: !settings.particlesEnabled })} 
                       />
                     </div>
                   </div>
@@ -216,10 +201,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                       <span className="text-sm text-gray-400">Mostrar Consejos</span>
                       <Toggle 
                         checked={settings.showTips} 
-                        onChange={() => {
-                          playSfx();
-                          updateSettings({ ...settings, showTips: !settings.showTips });
-                        }} 
+                        onChange={() => updateSettings({ ...settings, showTips: !settings.showTips })} 
                       />
                     </div>
                     <div className="flex items-center justify-between">
@@ -227,10 +209,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                       <div className="relative">
                         <select 
                           value={settings.animSpeed}
-                          onChange={(e) => {
-                            playSfx();
-                            updateSettings({ ...settings, animSpeed: e.target.value as any });
-                          }}
+                          onChange={(e) => updateSettings({ ...settings, animSpeed: e.target.value as any })}
                           className="appearance-none bg-secondary-gray border border-accent-gray text-gray-300 text-xs py-2 px-8 font-cinzel focus:outline-none focus:border-primary-gold cursor-pointer"
                         >
                           <option value="Lenta">Lenta</option>

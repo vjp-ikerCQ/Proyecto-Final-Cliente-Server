@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Shield, Swords, ArrowLeft } from 'lucide-react';
 import backCardImage from '../../assets/images/backCard.png';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { type CardData } from '../../utils/cardData';
 import { useGameState, type BoardSlot } from './hooks/useGameState';
 import { useBotAI } from './hooks/useBotAI';
@@ -14,7 +14,9 @@ import { useChat } from './hooks/useChat';
 import { ChatOverlay } from './components/ChatOverlay';
 import { AttackAnimationOverlay } from './components/AttackAnimationOverlay';
 import { JokerAnimationOverlay } from './components/JokerAnimationOverlay';
+
 import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
+import SurrenderTransition from '../../components/UI/SurrenderTransition';
 
 const MAX_HP = 30;
 
@@ -35,7 +37,10 @@ interface GameProps {
 
 const Game: React.FC<GameProps> = ({ user }) => {
   const navigate = useNavigate();
-  const { playSfx, playMusic, stopMusic } = useSettings();
+  const location = useLocation();
+  const difficulty = location.state?.difficulty || 'hard'; // Por defecto hard para compatibilidad
+  const { playMusic, stopMusic } = useSettings();
+  const [isSurrendering, setIsSurrendering] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -46,7 +51,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
       clearTimeout(timer);
       stopMusic();
     };
-  }, []);
+  }, [playMusic, stopMusic]);
 
   // Custom Hooks para estado y bot
   const gameState = useGameState();
@@ -81,6 +86,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
     joker3Resurrect,
     joker2Swap,
     moveCaballo,
+    healCardCopa,
   } = gameState;
 
   const { playerSynergy, opponentSynergy } = useSuitSynergy({
@@ -101,6 +107,11 @@ const Game: React.FC<GameProps> = ({ user }) => {
   const [isDragOverDiscard, setIsDragOverDiscard] = useState(false);
   const [gameOver, setGameOver] = useState<'victory' | 'defeat' | null>(null);
   const statsUpdated = useRef(false);
+
+  // Estado del popup del As de Copas
+  const [copaPopupSlot, setCopaPopupSlot] = useState<number | null>(null);
+  const [copaHealSourceSlot, setCopaHealSourceSlot] = useState<number | null>(null);
+  const [copaActedIds, setCopaActedIds] = useState<string[]>([]);
 
   // Estado del popup y movimiento del Caballo
   const [caballoPopupSlot, setCaballoPopupSlot] = useState<number | null>(null);
@@ -145,7 +156,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
     const attackerBoard = isPlayer ? board : opponentBoard;
     const defenderBoard = isPlayer ? opponentBoard : board;
     const attackerCard = attackerBoard[attackerSlotIndex]?.card;
-
+    
     if (!attackerCard) {
       executeAction();
       return;
@@ -190,6 +201,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
   };
 
   useBotAI({
+    difficulty,
     isPlayerTurn,
     isLoading,
     opponentVoluntad,
@@ -217,19 +229,19 @@ const Game: React.FC<GameProps> = ({ user }) => {
   });
   const { messages, visible, input, setInput, sendMessage, toggleChat } = useChat();
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        const active = document.activeElement as HTMLElement;
-        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
-          return;
-        }
-        toggleChat();
+useEffect(() => {
+  const handler = (e: KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      const active = document.activeElement as HTMLElement;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+        return;
       }
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [toggleChat]);
+      toggleChat();
+    }
+  };
+  document.addEventListener('keydown', handler);
+  return () => document.removeEventListener('keydown', handler);
+}, [toggleChat]);
 
   useEffect(() => {
     if (voluntad < 5) {
@@ -284,6 +296,15 @@ const Game: React.FC<GameProps> = ({ user }) => {
 
   const handlePlayerSlotClick = (slotIndex: number) => {
     const slot = board[slotIndex];
+
+    // ── Fase de curación del As de Copas ──
+    if (copaHealSourceSlot !== null) {
+      if (slot.card) {
+        healCardCopa(slotIndex);
+      }
+      setCopaHealSourceSlot(null);
+      return;
+    }
 
     // ── Fase de movimiento del Caballo ──
     if (caballoMoveSourceSlot !== null) {
@@ -351,6 +372,14 @@ const Game: React.FC<GameProps> = ({ user }) => {
 
       if (!isPlayerTurn) return;
 
+      // As de Copas: mostrar popup atacar/curar
+      if (slot.card && slot.card.rank === 1 && slot.card.suit === 'copas') {
+        setCopaPopupSlot(prev => prev === slotIndex ? null : slotIndex);
+        setSelectedAttackerIndex(null);
+        setSelectedHandCardIndex(null);
+        return;
+      }
+
       // Caballo: mostrar popup de acción en vez de seleccionar directamente
       if (slot.card && slot.card.role.toUpperCase() === 'CABALLO') {
         setCaballoPopupSlot(prev => prev === slotIndex ? null : slotIndex);
@@ -371,9 +400,9 @@ const Game: React.FC<GameProps> = ({ user }) => {
       if (isOpponentSlotActiveToAttack(slotIndex)) {
         const isMago = attackerCard?.role.toUpperCase() === 'MAGO';
         const magoAttacksCount = (playerMagoAttacks[selectedAttackerIndex] || []).length;
-
+        
         wrappedAttackCard(true, selectedAttackerIndex, slotIndex);
-
+        
         // Deseleccionar al atacante si no es un Mago, o si ya ha realizado su segundo ataque
         if (!isMago || magoAttacksCount >= 1) {
           setSelectedAttackerIndex(null);
@@ -407,6 +436,9 @@ const Game: React.FC<GameProps> = ({ user }) => {
     setCaballoPopupSlot(null);
     setCaballoMoveSourceSlot(null);
     setCaballoMovedIds([]);
+    setCopaPopupSlot(null);
+    setCopaHealSourceSlot(null);
+    setCopaActedIds([]);
     initializeGame();
   };
 
@@ -519,6 +551,9 @@ const Game: React.FC<GameProps> = ({ user }) => {
     setCaballoPopupSlot(null);
     setCaballoMoveSourceSlot(null);
     setCaballoMovedIds([]);
+    setCopaPopupSlot(null);
+    setCopaHealSourceSlot(null);
+    setCopaActedIds([]);
   };
 
   const handleOpponentHandCardClick = (i: number) => {
@@ -595,19 +630,19 @@ const Game: React.FC<GameProps> = ({ user }) => {
 
     const isMago = attackerCard.role.toUpperCase() === 'MAGO';
     const hasAlreadyAttackedOnce = isMago && (playerMagoAttacks[selectedAttackerIndex] || []).length > 0;
-
+    
     // Solo verificar costo si no es el segundo ataque de un mago
-    if (!hasAlreadyAttackedOnce && voluntad < attackerCard.cost) return false;
+    if (!hasAlreadyAttackedOnce && voluntad < attackerCard.cost) return false; 
 
     // Si el atacante es un mago, verificar que no haya atacado a este mismo objetivo en este turno
     if (isMago) {
       if (hasMagoAttackedTarget(true, selectedAttackerIndex, slotIndex)) return false;
     }
 
-    // Solo asesino, tanque, tirador, pícaro, mago y sota pueden elegir a qué carta pegar
+    const isAs = attackerCard.rank === 1;
     const TARGETING_ROLES = ['ASESINO', 'TANQUE', 'TIRADOR', 'PICARO', 'MAGO', 'SOTA'];
-    if (!TARGETING_ROLES.includes(attackerCard.role.toUpperCase())) {
-      // Si no es un rol de target, solo puede pegar a su propia columna vertical
+    if (!TARGETING_ROLES.includes(attackerCard.role.toUpperCase()) && !isAs) {
+      // Si no es un rol de target y no es un AS, solo puede pegar a su propia columna vertical
       if (selectedAttackerIndex !== slotIndex) return false;
     }
 
@@ -658,7 +693,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
   };
 
   return (
-    <motion.div
+    <motion.div 
       animate={isShaking ? { x: [-2, 2, -2, 2, 0], y: [-1, 1, -1, 1, 0] } : {}}
       transition={{ duration: 0.4 }}
       className="h-screen w-full bg-bg-main text-text-main overflow-hidden font-spectral flex flex-col relative"
@@ -670,30 +705,27 @@ const Game: React.FC<GameProps> = ({ user }) => {
 
       {/* HEADER */}
       <header className="relative z-20 p-1 md:p-2 lg:p-3 flex flex-col sm:flex-row justify-between items-center gap-1 md:gap-3 border-b border-white/5 bg-black/40 backdrop-blur-md shrink-0">
-
-        {/* Pantalla de Carga del Duelo */}
-        <AnimatePresence>
-          {isLoading && (
-            <motion.div
-              initial={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center gap-6"
-            >
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-                className="w-20 h-20 border-t-2 border-primary-gold rounded-full"
-              />
-              <h2 className="text-primary-gold font-cinzel tracking-[0.3em] uppercase text-xl animate-pulse">Preparando Mazo...</h2>
-            </motion.div>
-          )}
-        </AnimatePresence>
+      
+      {/* Pantalla de Carga del Duelo */}
+      <AnimatePresence>
+        {isLoading && (
+          <motion.div 
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center gap-6"
+          >
+            <motion.div 
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+              className="w-20 h-20 border-t-2 border-primary-gold rounded-full"
+            />
+            <h2 className="text-primary-gold font-cinzel tracking-[0.3em] uppercase text-xl animate-pulse">Preparando Mazo...</h2>
+          </motion.div>
+        )}
+      </AnimatePresence>
         <div className="flex justify-between w-full sm:w-auto items-center px-2">
           <button
-            onClick={() => {
-              playSfx();
-              setShowSurrenderModal(true);
-            }}
+            onClick={() => setShowSurrenderModal(true)}
             className="flex items-center gap-1.5 text-gray-500 hover:text-red-500 transition-colors"
           >
             <ArrowLeft size={12} className="md:w-3.5 md:h-3.5" />
@@ -767,12 +799,13 @@ const Game: React.FC<GameProps> = ({ user }) => {
                   animate={{ y: isOppSel ? '-10%' : isSelectable ? '-45%' : '-72%' }}
                   exit={{ y: '-85%', opacity: 0 }}
                   transition={{ type: 'spring', stiffness: 280, damping: 24 }}
-                  className={`relative w-10 sm:w-12 md:w-14 aspect-[2/3] shrink-0 rounded-md border-2 overflow-hidden transition-shadow ${isOppSel
+                  className={`relative w-10 sm:w-12 md:w-14 aspect-[2/3] shrink-0 rounded-md border-2 overflow-hidden transition-shadow ${
+                    isOppSel
                       ? 'border-purple-400 shadow-[0_0_18px_rgba(168,85,247,0.8)] pointer-events-auto cursor-pointer'
                       : isSelectable
                         ? 'border-purple-500/50 pointer-events-auto cursor-pointer hover:border-purple-400/80'
                         : 'border-white/10'
-                    }`}
+                  }`}
                   onClick={() => isSelectable && handleOpponentHandCardClick(i)}
                 >
                   <img src={backCardImage} className="w-full h-full object-cover opacity-80" />
@@ -794,6 +827,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
               key={`opp-${i}`}
               id={`opponent-board-slot-${i}`}
               slot={slot}
+              isOpponent
               onSelect={setViewingCard}
               isActiveToAttack={isOpponentSlotActiveToAttack(i) && slot.card !== null}
               onClick={() => handleOpponentSlotClick(i)}
@@ -821,7 +855,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
               id={`player-board-slot-${i}`}
               slot={slot}
               onSelect={setViewingCard}
-              isAttacking={selectedAttackerIndex === i || caballoPopupSlot === i}
+              isAttacking={selectedAttackerIndex === i || caballoPopupSlot === i || copaPopupSlot === i}
               hasAttacked={gameState.playerAttackedIndices.includes(i)}
               isActiveToPlay={selectedHandCardIndex !== null && !slot.card && !selectedIsJoker && canAffordSelected && joker2Phase === null && caballoMoveSourceSlot === null}
               isActiveToHeal={isAlliedSlotActiveToHeal(i)}
@@ -835,6 +869,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
                 i !== caballoMoveSourceSlot &&
                 Math.abs(i - caballoMoveSourceSlot) === 1
               }
+              isActiveForCopaHeal={copaHealSourceSlot !== null && !!slot.card}
               onClick={() => handlePlayerSlotClick(i)}
               synergyGlow={playerSynergy.isActive ? playerSynergy.suit : null}
             />
@@ -877,12 +912,13 @@ const Game: React.FC<GameProps> = ({ user }) => {
             onDragLeave={() => setIsDragOverDiscard(false)}
             onDrop={handleDiscardDrop}
           >
-            <div className={`relative w-10 sm:w-16 md:w-20 lg:w-24 aspect-[2/3] rounded-md border-2 overflow-hidden bg-[#080808] transition-all ${isDragOverDiscard && !playerHasDiscarded
+            <div className={`relative w-10 sm:w-16 md:w-20 lg:w-24 aspect-[2/3] rounded-md border-2 overflow-hidden bg-[#080808] transition-all ${
+              isDragOverDiscard && !playerHasDiscarded
                 ? 'border-red-400 bg-red-950/30 shadow-[0_0_12px_rgba(239,68,68,0.3)]'
                 : playerHasDiscarded
                   ? 'border-white/5 opacity-60'
                   : 'border-white/10'
-              }`}>
+            }`}>
               {discardPile.length > 0 ? (
                 <img src={backCardImage} className="w-full h-full object-cover opacity-80" />
               ) : (
@@ -987,12 +1023,13 @@ const Game: React.FC<GameProps> = ({ user }) => {
             <motion.button
               onClick={handleDiscard}
               disabled={selectedHandCardIndex === null || playerHasDiscarded}
-              className={`flex-1 md:w-full py-2.5 md:py-3 px-4 font-black uppercase tracking-widest rounded border text-[9px] md:text-xs text-center transition-all ${playerHasDiscarded
+              className={`flex-1 md:w-full py-2.5 md:py-3 px-4 font-black uppercase tracking-widest rounded border text-[9px] md:text-xs text-center transition-all ${
+                playerHasDiscarded
                   ? 'bg-transparent text-gray-700 border-white/5 cursor-not-allowed'
                   : selectedHandCardIndex !== null
                     ? 'bg-red-950/60 text-red-300 border-red-800/60 hover:bg-red-900/60 cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.15)]'
                     : 'bg-transparent text-gray-600 border-white/10 cursor-not-allowed'
-                }`}
+              }`}
             >
               {playerHasDiscarded ? '✓ Descartada' : 'Descartar'}
             </motion.button>
@@ -1000,15 +1037,81 @@ const Game: React.FC<GameProps> = ({ user }) => {
         </div>
       </footer>
 
-      {/* CHAT OVERLAY */}
-      <ChatOverlay
-        messages={messages}
-        visible={visible}
-        input={input}
-        setInput={setInput}
-        sendMessage={sendMessage}
-        toggleChat={toggleChat}
-      />
+        {/* CHAT OVERLAY */}
+        <ChatOverlay
+          messages={messages}
+          visible={visible}
+          input={input}
+          setInput={setInput}
+          sendMessage={sendMessage}
+          toggleChat={toggleChat}
+        />
+      {/* POPUP AS DE COPAS */}
+      <AnimatePresence>
+        {copaPopupSlot !== null && (() => {
+          const copaSlot = board[copaPopupSlot];
+          const hasActed = copaSlot.card ? copaActedIds.includes(copaSlot.card.id) : true;
+          const hasAttacked = gameState.playerAttackedIndices.includes(copaPopupSlot);
+          const blocked = hasActed || hasAttacked;
+          return (
+            <motion.div
+              key="copa-popup"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[95] flex items-center justify-center"
+              onClick={() => setCopaPopupSlot(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.85, y: 10 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.85, y: 10 }}
+                className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-5 shadow-2xl flex flex-col gap-3 min-w-[200px]"
+                onClick={e => e.stopPropagation()}
+              >
+                <span className="text-[9px] uppercase tracking-[0.4em] text-[#00ccff] text-center font-cinzel">As de Copas</span>
+                <button
+                  disabled={blocked}
+                  onClick={() => {
+                    setCopaPopupSlot(null);
+                    setSelectedAttackerIndex(copaPopupSlot);
+                  }}
+                  className={`py-2.5 px-4 rounded-lg border text-[11px] font-black uppercase tracking-widest transition-all ${
+                    blocked
+                      ? 'opacity-30 cursor-not-allowed border-white/10 text-white/30'
+                      : 'border-red-500/60 text-red-400 hover:bg-red-950/40 cursor-pointer'
+                  }`}
+                >
+                  ⚔ Atacar
+                </button>
+                <button
+                  disabled={blocked}
+                  onClick={() => {
+                    const card = board[copaPopupSlot!].card;
+                    if (card) setCopaActedIds(prev => [...prev, card.id]);
+                    setCopaHealSourceSlot(copaPopupSlot);
+                    setCopaPopupSlot(null);
+                  }}
+                  className={`py-2.5 px-4 rounded-lg border text-[11px] font-black uppercase tracking-widest transition-all ${
+                    blocked
+                      ? 'opacity-30 cursor-not-allowed border-white/10 text-white/30'
+                      : 'border-emerald-400/60 text-emerald-300 hover:bg-emerald-950/40 cursor-pointer'
+                  }`}
+                >
+                  ✦ Curar
+                </button>
+                <button
+                  onClick={() => setCopaPopupSlot(null)}
+                  className="text-[9px] text-gray-600 hover:text-gray-400 uppercase tracking-widest pt-1"
+                >
+                  Cancelar
+                </button>
+              </motion.div>
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
+
       {/* POPUP CABALLO */}
       <AnimatePresence>
         {caballoPopupSlot !== null && (() => {
@@ -1041,10 +1144,11 @@ const Game: React.FC<GameProps> = ({ user }) => {
                     setCaballoPopupSlot(null);
                     setSelectedAttackerIndex(caballoPopupSlot);
                   }}
-                  className={`py-2.5 px-4 rounded-lg border text-[11px] font-black uppercase tracking-widest transition-all ${hasAttacked
+                  className={`py-2.5 px-4 rounded-lg border text-[11px] font-black uppercase tracking-widest transition-all ${
+                    hasAttacked
                       ? 'opacity-30 cursor-not-allowed border-white/10 text-white/30'
                       : 'border-red-500/60 text-red-400 hover:bg-red-950/40 cursor-pointer'
-                    }`}
+                  }`}
                 >
                   ⚔ Atacar
                 </button>
@@ -1055,10 +1159,11 @@ const Game: React.FC<GameProps> = ({ user }) => {
                     setCaballoPopupSlot(null);
                     setCaballoMoveSourceSlot(src);
                   }}
-                  className={`py-2.5 px-4 rounded-lg border text-[11px] font-black uppercase tracking-widest transition-all ${!canMove
+                  className={`py-2.5 px-4 rounded-lg border text-[11px] font-black uppercase tracking-widest transition-all ${
+                    !canMove
                       ? 'opacity-30 cursor-not-allowed border-white/10 text-white/30'
                       : 'border-orange-400/60 text-orange-300 hover:bg-orange-950/40 cursor-pointer'
-                    }`}
+                  }`}
                 >
                   ↔ Moverse
                 </button>
@@ -1101,20 +1206,31 @@ const Game: React.FC<GameProps> = ({ user }) => {
                   </div>
                 </div>
                 <div className="flex justify-center md:justify-start gap-4">
-                  {viewingCard.suit !== 'jokers' && (
-                    <>
-                      <div className="flex flex-col items-center gap-1">
-                        <span className="text-[9px] uppercase tracking-widest text-accent-gray">Ataque</span>
-                        <span className="text-xl font-bold text-red-400">{viewingCard.attack}</span>
-                      </div>
-                      <div className="w-px bg-white/10" />
-                      <div className="flex flex-col items-center gap-1">
-                        <span className="text-[9px] uppercase tracking-widest text-accent-gray">Vida</span>
-                        <span className="text-xl font-bold text-green-400">{viewingCard.health}</span>
-                      </div>
-                      <div className="w-px bg-white/10" />
-                    </>
-                  )}
+                  {viewingCard.suit !== 'jokers' && (() => {
+                    const baseAtk = viewingCard.attack;
+                    const bonus = viewingCard.ladderBonus || 0;
+                    const currentAtk = typeof baseAtk === 'number' ? baseAtk + bonus : baseAtk;
+                    const maxHp = viewingCard.maxHealth ?? viewingCard.health;
+                    return (
+                      <>
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="text-[9px] uppercase tracking-widest text-accent-gray">Ataque</span>
+                          <span className="text-xl font-bold text-red-400">
+                            {bonus > 0 ? `${currentAtk}` : `${baseAtk}`}
+                          </span>
+                          {bonus > 0 && (
+                            <span className="text-[9px] text-red-300/60">(base {baseAtk})</span>
+                          )}
+                        </div>
+                        <div className="w-px bg-white/10" />
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="text-[9px] uppercase tracking-widest text-accent-gray">Vida</span>
+                          <span className="text-xl font-bold text-green-400">{viewingCard.health}<span className="text-sm text-green-600">/{maxHp}</span></span>
+                        </div>
+                        <div className="w-px bg-white/10" />
+                      </>
+                    );
+                  })()}
                   <div className="flex flex-col items-center gap-1">
                     <span className="text-[9px] uppercase tracking-widest text-accent-gray">Coste</span>
                     <span className="text-xl font-bold text-blue-400">{viewingCard.cost}</span>
@@ -1128,111 +1244,6 @@ const Game: React.FC<GameProps> = ({ user }) => {
               </div>
             </div>
           </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* AVISOS DE JUEGO */}
-      <AnimatePresence>
-        {warningText && (
-          <motion.div
-            key={warningText}
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="fixed bottom-32 left-1/2 -translate-x-1/2 z-150 pointer-events-none"
-          >
-            <div className="flex items-center gap-2 bg-black/90 border border-primary-gold/40 rounded-lg px-4 py-2.5 shadow-[0_0_20px_rgba(166,138,100,0.2)] backdrop-blur-md">
-              <span className="text-primary-gold text-lg font-black">⚡</span>
-              <span className="text-primary-gold font-bold uppercase tracking-widest text-[10px] md:text-xs whitespace-nowrap">
-                {warningText}
-              </span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* INSTRUCCIÓN FLOTANTE JOKER 1 */}
-      <AnimatePresence>
-        {joker1Phase && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="fixed top-20 left-1/2 -translate-x-1/2 z-80 pointer-events-none"
-          >
-            <div className="bg-purple-950/95 border border-purple-500/60 rounded-xl px-5 py-3 text-center shadow-[0_0_20px_rgba(168,85,247,0.3)] backdrop-blur-md">
-              <p className="text-purple-300 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em]">
-                ✦ Joker de Intercambio ✦
-              </p>
-              <p className="text-white text-[9px] md:text-xs mt-1 font-medium">
-                {joker1Phase === 'player'
-                  ? `Selecciona 2 cartas de tu mano (${joker1PlayerSelections.length}/2)`
-                  : `Elige 2 cartas del rival a ciegas (${joker1OpponentSelections.length}/2)`}
-              </p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* INSTRUCCIÓN FLOTANTE JOKER 2 */}
-      <AnimatePresence>
-        {joker2Phase && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="fixed top-20 left-1/2 -translate-x-1/2 z-80 pointer-events-none"
-          >
-            <div className="bg-purple-950/95 border border-purple-500/60 rounded-xl px-5 py-3 text-center shadow-[0_0_20px_rgba(168,85,247,0.3)] backdrop-blur-md">
-              <p className="text-purple-300 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em]">
-                ✦ Joker de Retorno ✦
-              </p>
-              <p className="text-white text-[9px] md:text-xs mt-1 font-medium">
-                {joker2Phase === 'board'
-                  ? 'Selecciona una carta de tu tablero'
-                  : 'Selecciona una carta de tu mano para intercambiar'}
-              </p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ANIMACIÓN PHASER DE JOKER */}
-      <AnimatePresence>
-        {jokerAnim && (
-          <JokerAnimationOverlay
-            jokerCard={jokerAnim.card}
-            onComplete={handleJokerAnimComplete}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* ANIMACIÓN PHASER DE ATAQUE */}
-      <AnimatePresence>
-        {activeAttackAnim && (
-          <AttackAnimationOverlay
-            attackerCard={activeAttackAnim.attackerCard}
-            targetCard={activeAttackAnim.targetCard}
-            isDirect={activeAttackAnim.isDirect}
-            isHeal={activeAttackAnim.isHeal}
-            isPlayerAttacker={activeAttackAnim.isPlayerAttacker}
-            attackerSlotIndex={activeAttackAnim.attackerSlotIndex}
-            targetSlotIndex={activeAttackAnim.targetSlotIndex}
-            onComplete={activeAttackAnim.onComplete}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* MODAL FIN DE PARTIDA: VICTORIA / DERROTA */}
-      <AnimatePresence>
-        {gameOver && (
-          <GameOverOverlay
-            result={gameOver}
-            userName={user.name || 'Héroe'}
-            onRestart={handleRestart}
-            onMainMenu={() => navigate('/menu')}
-          />
         )}
       </AnimatePresence>
 
@@ -1361,16 +1372,13 @@ const Game: React.FC<GameProps> = ({ user }) => {
               </div>
               <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter mb-4">¿Abandonar el combate?</h3>
               <p className="text-gray-400 mb-8 leading-relaxed">
-                Si te rindes ahora, la batalla se considerará una <span className="text-red-500 font-bold uppercase">derrota</span> deshonrosa.
+                Si te rindes ahora, la batalla se considerará una <span className="text-red-500 font-bold uppercase">derrota</span> deshonrosa. 
                 <br /><br />
                 ¿Estás seguro de que deseas retirarte a las sombras?
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <button
-                  onClick={() => {
-                    playSfx();
-                    setShowSurrenderModal(false);
-                  }}
+                  onClick={() => setShowSurrenderModal(false)}
                   className="flex-1 py-3 px-6 border border-white/10 rounded-lg text-white uppercase tracking-widest text-xs font-bold hover:bg-white/5 transition-all"
                 >
                   Seguir Luchando
@@ -1382,7 +1390,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
                       updateMatchStats(user.name, 'lose');
                     }
                     setShowSurrenderModal(false);
-                    setGameOver('defeat');
+                    setIsSurrendering(true);
                   }}
                   className="flex-1 py-3 px-6 bg-red-600 text-white rounded-lg uppercase tracking-widest text-xs font-black hover:bg-red-500 shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all"
                 >
@@ -1391,6 +1399,12 @@ const Game: React.FC<GameProps> = ({ user }) => {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isSurrendering && (
+          <SurrenderTransition onComplete={() => navigate('/menu')} />
         )}
       </AnimatePresence>
     </motion.div>
@@ -1496,9 +1510,10 @@ const BoardSlotView: React.FC<{
   isActiveToStack?: boolean;
   isJoker2Target?: boolean;
   isActiveForCaballoMove?: boolean;
+  isActiveForCopaHeal?: boolean;
   onClick?: () => void;
   synergyGlow?: string | null;
-}> = ({ slot, id, isOpponent: _isOpponent, onSelect, isActiveToPlay, isAttacking, hasAttacked, isActiveToAttack, isActiveToHeal, isActiveToStack, isJoker2Target, isActiveForCaballoMove, onClick, synergyGlow }) => {
+}> = ({ slot, id, isOpponent: _isOpponent, onSelect, isActiveToPlay, isAttacking, hasAttacked, isActiveToAttack, isActiveToHeal, isActiveToStack, isJoker2Target, isActiveForCaballoMove, isActiveForCopaHeal, onClick, synergyGlow }) => {
   return (
     <div
       id={id}
@@ -1519,11 +1534,13 @@ const BoardSlotView: React.FC<{
                     : isActiveToStack
                       ? 'border-amber-500 bg-amber-500/10 animate-pulse cursor-pointer shadow-[0_0_20px_rgba(251,191,36,0.5)] z-30'
                       : 'border-white/5 bg-white/[0.01]'
-          : isActiveForCaballoMove
+          : isActiveForCopaHeal
+            ? 'border-emerald-400 bg-emerald-400/10 animate-pulse cursor-pointer shadow-[0_0_20px_rgba(52,211,153,0.4)] z-30'
+            : isActiveForCaballoMove
             ? 'border-orange-400 bg-orange-400/10 animate-pulse cursor-pointer shadow-[0_0_20px_rgba(251,146,60,0.4)] z-30'
             : isActiveToPlay
-              ? 'border-primary-gold bg-primary-gold/10 animate-pulse cursor-pointer shadow-lg'
-              : 'border-white/5 bg-white/[0.01]'}
+            ? 'border-primary-gold bg-primary-gold/10 animate-pulse cursor-pointer shadow-lg'
+            : 'border-white/5 bg-white/[0.01]'}
       `}
     >
       <AnimatePresence>
@@ -1538,103 +1555,103 @@ const BoardSlotView: React.FC<{
             onClick={(e) => { e.stopPropagation(); onClick?.(); }}
             onContextMenu={(e) => { e.preventDefault(); onSelect(slot.card!); }}
           >
-            <div
-              className={`w-full h-full relative rounded-md md:rounded-lg border-2 bg-[#080808] transition-all duration-500 group-hover:-translate-y-2 md:group-hover:-translate-y-4 group-hover:z-50`}
-              style={(() => {
-                const synergyColor = synergyGlow ? suitColors[synergyGlow as keyof typeof suitColors] : null;
-                if (isJoker2Target) return { borderColor: '#a855f7', boxShadow: '0 0 18px rgba(168,85,247,0.5)' };
-                if (isAttacking) return { borderColor: '#22c55e', boxShadow: '0 0 15px rgba(34,197,94,0.3)' };
-                if (isActiveToAttack) return { borderColor: '#ef4444', boxShadow: '0 0 15px rgba(239,68,68,0.3)' };
-                if (isActiveToHeal) return { borderColor: '#22c55e', boxShadow: '0 0 15px rgba(34,197,94,0.3)' };
-                if (synergyColor) return {
-                  borderColor: synergyColor,
-                  boxShadow: `0 0 18px ${synergyColor}99, 0 0 40px ${synergyColor}44`,
-                };
-                return { borderColor: `${suitColors[slot.card.suit]}88`, boxShadow: `0 0 15px ${suitColors[slot.card.suit]}11` };
-              })()}
-            >
-              <div className="w-full h-full overflow-hidden relative rounded-[inherit]">
-                <img src={slot.card.image} className="w-full h-full object-cover" />
+          <div
+            className={`w-full h-full relative rounded-md md:rounded-lg border-2 bg-[#080808] transition-all duration-500 group-hover:-translate-y-2 md:group-hover:-translate-y-4 group-hover:z-50`}
+            style={(() => {
+              const synergyColor = synergyGlow ? suitColors[synergyGlow as keyof typeof suitColors] : null;
+              if (isJoker2Target) return { borderColor: '#a855f7', boxShadow: '0 0 18px rgba(168,85,247,0.5)' };
+              if (isAttacking) return { borderColor: '#22c55e', boxShadow: '0 0 15px rgba(34,197,94,0.3)' };
+              if (isActiveToAttack) return { borderColor: '#ef4444', boxShadow: '0 0 15px rgba(239,68,68,0.3)' };
+              if (isActiveToHeal) return { borderColor: '#22c55e', boxShadow: '0 0 15px rgba(34,197,94,0.3)' };
+              if (synergyColor) return {
+                borderColor: synergyColor,
+                boxShadow: `0 0 18px ${synergyColor}99, 0 0 40px ${synergyColor}44`,
+              };
+              return { borderColor: `${suitColors[slot.card.suit]}88`, boxShadow: `0 0 15px ${suitColors[slot.card.suit]}11` };
+            })()}
+          >
+            <div className="w-full h-full overflow-hidden relative rounded-[inherit]">
+              <img src={slot.card.image} className="w-full h-full object-cover" />
 
-                {/* OVERLAY ESTILO GALERIA (COMPLETO) */}
-                <div className="absolute inset-0 bg-black/85 backdrop-blur-[3px] opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col p-2 md:p-4 overflow-y-auto scrollbar-hide">
-                  {/* Rol Central con rallas */}
-                  <div className="flex-1 flex flex-col items-center justify-center text-center">
-                    <div className="w-4 md:w-10 h-px bg-white/20 mb-1 md:mb-2" />
-                    <span className="text-[6px] md:text-[10px] uppercase tracking-[0.2em] md:tracking-[0.4em] text-white/50 font-cinzel leading-none">
-                      {slot.card.role}
-                    </span>
-                    <div className="w-4 md:w-10 h-px bg-white/20 mt-1 md:mt-2" />
-                  </div>
-
-                  {/* Info inferior: Nombre, Stats y Descripción */}
-                  <div className="mt-auto text-center md:text-left">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-[6px] md:text-[10px] text-white/70 uppercase">
-                        ATK: {slot.card.ladderBonus ? `${slot.card.attack}+${slot.card.ladderBonus}` : slot.card.attack}
-                      </span>
-                      <span className="text-[6px] md:text-[10px] text-white/70 uppercase">HP: {slot.card.health}</span>
-                    </div>
-                    <div className="border-t border-white/10 pt-1 md:pt-2">
-                      <p className="text-[5px] md:text-[9px] text-gray-400 italic leading-tight line-clamp-3 md:line-clamp-none">
-                        {slot.card.effect}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="absolute bottom-0 left-0 right-0 p-1 md:p-2 bg-gradient-to-t from-black to-transparent flex justify-between items-center group-hover:opacity-0 transition-opacity">
-                  <span className="text-red-500 font-bold text-[8px] md:text-xs">
-                    {slot.card.ladderBonus ? `${slot.card.attack}+${slot.card.ladderBonus}` : slot.card.attack}
+              {/* OVERLAY ESTILO GALERIA (COMPLETO) */}
+              <div className="absolute inset-0 bg-black/85 backdrop-blur-[3px] opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col p-2 md:p-4 overflow-y-auto scrollbar-hide">
+                {/* Rol Central con rallas */}
+                <div className="flex-1 flex flex-col items-center justify-center text-center">
+                  <div className="w-4 md:w-10 h-px bg-white/20 mb-1 md:mb-2" />
+                  <span className="text-[6px] md:text-[10px] uppercase tracking-[0.2em] md:tracking-[0.4em] text-white/50 font-cinzel leading-none">
+                    {slot.card.role}
                   </span>
-                  <span className="text-blue-400 font-bold text-[8px] md:text-xs">{slot.card.health}</span>
+                  <div className="w-4 md:w-10 h-px bg-white/20 mt-1 md:mt-2" />
+                </div>
+
+                {/* Info inferior: Nombre, Stats y Descripción */}
+                <div className="mt-auto text-center md:text-left">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[6px] md:text-[10px] text-white/70 uppercase">
+                      ATK: {slot.card.ladderBonus ? `${slot.card.attack}+${slot.card.ladderBonus}` : slot.card.attack}
+                    </span>
+                    <span className="text-[6px] md:text-[10px] text-white/70 uppercase">HP: {slot.card.health}</span>
+                  </div>
+                  <div className="border-t border-white/10 pt-1 md:pt-2">
+                    <p className="text-[5px] md:text-[9px] text-gray-400 italic leading-tight line-clamp-3 md:line-clamp-none">
+                      {slot.card.effect}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="absolute bottom-0 left-0 right-0 p-1 md:p-2 bg-gradient-to-t from-black to-transparent flex justify-between items-center group-hover:opacity-0 transition-opacity">
+                <span className="text-red-500 font-bold text-[8px] md:text-xs">
+                  {slot.card.ladderBonus ? `${slot.card.attack}+${slot.card.ladderBonus}` : slot.card.attack}
+                </span>
+                <span className="text-blue-400 font-bold text-[8px] md:text-xs">{slot.card.health}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Indicador de costo de voluntad en el tablero */}
+          <div className="absolute -top-1 -right-1 md:-top-2 md:-right-2 z-[60]">
+            <div
+              className="w-4 h-4 md:w-7 md:h-7 rounded-full bg-black/95 backdrop-blur-md flex items-center justify-center border md:border-2 shadow-2xl"
+              style={{ borderColor: suitColors[slot.card.suit] }}
+            >
+              <span className="text-[7px] md:text-xs font-bold" style={{ color: suitColors[slot.card.suit] }}>{slot.card.cost}</span>
+            </div>
+          </div>
+
+          {slot.stack.length > 1 && (
+            <div className="group/ladder absolute -bottom-2 -left-2 z-50">
+              <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-amber-500/90 text-black flex items-center justify-center font-black text-[8px] md:text-[10px] border border-amber-300 shadow-[0_0_8px_rgba(251,191,36,0.8)] cursor-default select-none">
+                {slot.stack.length}
+              </div>
+              <div className="absolute bottom-full left-0 mb-1 hidden group-hover/ladder:block pointer-events-none">
+                <div className="bg-black/90 border border-amber-500/50 rounded px-2 py-1 text-[8px] md:text-[9px] text-amber-400 font-bold uppercase tracking-wide whitespace-nowrap">
+                  Escalera de {slot.stack.length}: +{slot.stack.length - 1} ATK extra
                 </div>
               </div>
             </div>
+          )}
 
-            {/* Indicador de costo de voluntad en el tablero */}
-            <div className="absolute -top-1 -right-1 md:-top-2 md:-right-2 z-[60]">
-              <div
-                className="w-4 h-4 md:w-7 md:h-7 rounded-full bg-black/95 backdrop-blur-md flex items-center justify-center border md:border-2 shadow-2xl"
-                style={{ borderColor: suitColors[slot.card.suit] }}
-              >
-                <span className="text-[7px] md:text-xs font-bold" style={{ color: suitColors[slot.card.suit] }}>{slot.card.cost}</span>
-              </div>
+          {/* Indicadores de estado: escudo, veneno, sangrado */}
+          {(slot.card.shield || !!slot.card.poisonTurns || !!slot.card.bleedTurns) && (
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-40 flex flex-col gap-0.5 items-center pointer-events-none">
+              {slot.card.shield && (
+                <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-yellow-400 border border-yellow-200 flex items-center justify-center shadow-[0_0_6px_rgba(234,179,8,0.8)]" title="Escudo">
+                  <span className="text-[6px] md:text-[8px] leading-none select-none">🛡</span>
+                </div>
+              )}
+              {!!slot.card.poisonTurns && (
+                <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-purple-600 border border-purple-400 flex items-center justify-center shadow-[0_0_6px_rgba(147,51,234,0.8)]" title={`Veneno (${slot.card.poisonTurns} turnos)`}>
+                  <span className="text-[6px] md:text-[8px] leading-none select-none font-bold text-white">{slot.card.poisonTurns}</span>
+                </div>
+              )}
+              {!!slot.card.bleedTurns && (
+                <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-red-600 border border-red-400 flex items-center justify-center shadow-[0_0_6px_rgba(220,38,38,0.8)]" title="Sangrado">
+                  <span className="text-[6px] md:text-[8px] leading-none select-none">🩸</span>
+                </div>
+              )}
             </div>
-
-            {slot.stack.length > 1 && (
-              <div className="group/ladder absolute -bottom-2 -left-2 z-50">
-                <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-amber-500/90 text-black flex items-center justify-center font-black text-[8px] md:text-[10px] border border-amber-300 shadow-[0_0_8px_rgba(251,191,36,0.8)] cursor-default select-none">
-                  {slot.stack.length}
-                </div>
-                <div className="absolute bottom-full left-0 mb-1 hidden group-hover/ladder:block pointer-events-none">
-                  <div className="bg-black/90 border border-amber-500/50 rounded px-2 py-1 text-[8px] md:text-[9px] text-amber-400 font-bold uppercase tracking-wide whitespace-nowrap">
-                    Escalera de {slot.stack.length}: +{slot.stack.length - 1} ATK extra
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Indicadores de estado: escudo, veneno, sangrado */}
-            {(slot.card.shield || !!slot.card.poisonTurns || !!slot.card.bleedTurns) && (
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-40 flex flex-col gap-0.5 items-center pointer-events-none">
-                {slot.card.shield && (
-                  <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-yellow-400 border border-yellow-200 flex items-center justify-center shadow-[0_0_6px_rgba(234,179,8,0.8)]" title="Escudo">
-                    <span className="text-[6px] md:text-[8px] leading-none select-none">🛡</span>
-                  </div>
-                )}
-                {!!slot.card.poisonTurns && (
-                  <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-purple-600 border border-purple-400 flex items-center justify-center shadow-[0_0_6px_rgba(147,51,234,0.8)]" title={`Veneno (${slot.card.poisonTurns} turnos)`}>
-                    <span className="text-[6px] md:text-[8px] leading-none select-none font-bold text-white">{slot.card.poisonTurns}</span>
-                  </div>
-                )}
-                {!!slot.card.bleedTurns && (
-                  <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-red-600 border border-red-400 flex items-center justify-center shadow-[0_0_6px_rgba(220,38,38,0.8)]" title="Sangrado">
-                    <span className="text-[6px] md:text-[8px] leading-none select-none">🩸</span>
-                  </div>
-                )}
-              </div>
-            )}
+          )}
           </motion.div>
         )}
       </AnimatePresence>
