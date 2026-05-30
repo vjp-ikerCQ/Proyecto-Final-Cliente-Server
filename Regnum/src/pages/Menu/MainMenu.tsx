@@ -174,7 +174,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
           >
             <CornerDecoration />
             <div className={`${item.primary ? 'text-bg-main' : 'text-primary-gold group-hover:text-white'} transition-colors`}>
-              {React.cloneElement(item.icon as any, { size: (typeof window !== 'undefined' && window.innerWidth < 768) ? 14 : 20 })}
+              {React.cloneElement(item.icon as React.ReactElement<{ size?: number }>, { size: (typeof window !== 'undefined' && window.innerWidth < 768) ? 14 : 20 })}
             </div>
             <span className="text-[10px] md:text-base tracking-[0.2em] uppercase font-cinzel">
               {item.text}
