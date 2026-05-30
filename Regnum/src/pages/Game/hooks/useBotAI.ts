@@ -370,7 +370,7 @@ export const useBotAI = ({
   ]);
 };
 
-export const generateMockBotReply = (playerMessage: string): string => {
+export const generateMockBotReply = (_playerMessage: string): string => {
   const replies = [
     "¡Vaya, eso fue más útil que una cuchara de oro!",
     "¿De verdad piensas que eso funciona? 😂",

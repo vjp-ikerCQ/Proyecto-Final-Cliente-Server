@@ -1,14 +1,24 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../../contexts/SettingsContext';
 
+const SPLASH_MUSIC_URL = 'https://res.cloudinary.com/drvgncidb/video/upload/Assets/Folders/Home/regnumhollow/splash2.mp3';
+
 const SplashPage: React.FC = () => {
   const navigate = useNavigate();
-  const { playMusic } = useSettings();
+  const { playMusic, stopMusic } = useSettings();
+
+  // Play splash music after 250ms delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      playMusic(SPLASH_MUSIC_URL);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [playMusic]);
 
   const handleStart = () => {
-    playMusic('/audio/menu.mp3');
+    stopMusic();
     navigate('/login');
   };
 

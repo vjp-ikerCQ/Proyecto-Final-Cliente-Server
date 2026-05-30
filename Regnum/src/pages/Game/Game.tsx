@@ -15,6 +15,9 @@ import { ChatOverlay } from './components/ChatOverlay';
 import { AttackAnimationOverlay } from './components/AttackAnimationOverlay';
 import { JokerAnimationOverlay } from './components/JokerAnimationOverlay';
 
+import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
+import SurrenderTransition from '../../components/UI/SurrenderTransition';
+
 const MAX_HP = 30;
 
 /**
@@ -36,6 +39,19 @@ const Game: React.FC<GameProps> = ({ user }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const difficulty = location.state?.difficulty || 'hard'; // Por defecto hard para compatibilidad
+  const { playMusic, stopMusic } = useSettings();
+  const [isSurrendering, setIsSurrendering] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      playMusic(MUSIC_KEYS.BATTLE);
+    }, 1000);
+
+    return () => {
+      clearTimeout(timer);
+      stopMusic();
+    };
+  }, [playMusic, stopMusic]);
 
   // Custom Hooks para estado y bot
   const gameState = useGameState();
@@ -1374,7 +1390,7 @@ useEffect(() => {
                       updateMatchStats(user.name, 'lose');
                     }
                     setShowSurrenderModal(false);
-                    setGameOver('defeat');
+                    setIsSurrendering(true);
                   }}
                   className="flex-1 py-3 px-6 bg-red-600 text-white rounded-lg uppercase tracking-widest text-xs font-black hover:bg-red-500 shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all"
                 >
@@ -1383,6 +1399,12 @@ useEffect(() => {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isSurrendering && (
+          <SurrenderTransition onComplete={() => navigate('/menu')} />
         )}
       </AnimatePresence>
     </motion.div>

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { motion, type Variants } from 'framer-motion';
 import { Crown, Skull, RotateCcw, Home, Trophy, Flame } from 'lucide-react';
+import { useSettings } from '../../../contexts/SettingsContext';
 
 interface GameOverOverlayProps {
   result: 'victory' | 'defeat';
@@ -55,6 +56,33 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
   onMainMenu,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { settings } = useSettings();
+
+  // Play result audio on mount
+  useEffect(() => {
+    const volume = settings.sfxVolume ?? 0.5;
+    if (result === 'victory') {
+      const victoryMusic = new Audio('https://res.cloudinary.com/drvgncidb/video/upload/Assets/Folders/Home/regnumhollow/winning-loop.mp3');
+      victoryMusic.volume = volume;
+      victoryMusic.loop = true;
+      victoryMusic.play().catch(() => {});
+    } else {
+      // Defeat SFX
+      const defeatSfx = new Audio('https://res.cloudinary.com/drvgncidb/video/upload/Assets/Folders/Home/regnumhollow/mixkit-circus-lose.wav');
+      defeatSfx.volume = volume;
+      defeatSfx.play().catch(() => {});
+
+      // Random narrator voice lines
+      const voices = [
+        'https://res.cloudinary.com/drvgncidb/video/upload/Assets/Folders/Home/regnumhollow/game_over.mp3',
+        'https://res.cloudinary.com/drvgncidb/video/upload/Assets/Folders/Home/regnumhollow/loser.mp3',
+        'https://res.cloudinary.com/drvgncidb/video/upload/Assets/Folders/Home/regnumhollow/you_lose.mp3',
+      ];
+      const voice = new Audio(voices[Math.floor(Math.random() * voices.length)]);
+      voice.volume = volume;
+      setTimeout(() => { voice.play().catch(() => {}); }, 800);
+    }
+  }, [result, settings.sfxVolume]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

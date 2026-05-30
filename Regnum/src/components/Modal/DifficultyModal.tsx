@@ -6,14 +6,19 @@ import { useNavigate } from 'react-router-dom';
 interface DifficultyModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSelectDifficulty?: (difficulty: 'normal' | 'hard') => void;
 }
 
-const DifficultyModal: React.FC<DifficultyModalProps> = ({ isOpen, onClose }) => {
+const DifficultyModal: React.FC<DifficultyModalProps> = ({ isOpen, onClose, onSelectDifficulty }) => {
   const navigate = useNavigate();
 
   const handleSelectDifficulty = (difficulty: 'normal' | 'hard') => {
     onClose();
-    navigate('/game', { state: { difficulty } });
+    if (onSelectDifficulty) {
+      onSelectDifficulty(difficulty);
+    } else {
+      navigate('/game', { state: { difficulty } });
+    }
   };
 
   return (

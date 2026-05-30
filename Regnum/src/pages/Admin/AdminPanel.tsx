@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Users, Ticket, Shield, Edit, Trash, Check, LogOut, BookOpen, Settings, X, Search, TrendingUp, Layers } from 'lucide-react';
+import { Users, Ticket, Shield, Edit, Trash, Check, LogOut, BookOpen, Settings, X, Search, TrendingUp } from 'lucide-react';
 import SettingsModal from '../../components/Modal/SettingsModal';
 
 export default function AdminPanel() {
