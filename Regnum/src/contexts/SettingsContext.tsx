@@ -60,6 +60,26 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!musicRef.current) {
       musicRef.current = new Audio();
       musicRef.current.loop = true;
+      
+      musicRef.current.addEventListener('error', () => {
+        if (!musicRef.current) return;
+        const currentSrc = musicRef.current.src;
+        if (currentSrc.includes('cloudinary.com')) {
+          let fallback = '';
+          if (currentSrc.includes('splash2')) {
+            fallback = '/regnumhollow_2026/background/splash2.mp3';
+          } else if (currentSrc.includes('menu')) {
+            fallback = '/regnumhollow_2026/music/menu.mp3';
+          } else if (currentSrc.includes('battle')) {
+            fallback = '/regnumhollow_2026/music/battle_music_usxcot.mp3';
+          }
+          if (fallback) {
+            console.warn(`Music failed to load from Cloudinary. Falling back to local: ${fallback}`);
+            musicRef.current.src = fallback;
+            musicRef.current.play().catch(err => console.log("Playback error on fallback music:", err));
+          }
+        }
+      });
     }
   }, []);
 

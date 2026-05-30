@@ -17,6 +17,8 @@ import { JokerAnimationOverlay } from './components/JokerAnimationOverlay';
 
 import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
 import SurrenderTransition from '../../components/UI/SurrenderTransition';
+import { getCardSfxUrls, playSfxWithFallback, getGenericSfxUrls } from '../../utils/audioHelper';
+import DifficultyModal from '../../components/Modal/DifficultyModal';
 
 const MAX_HP = 30;
 
@@ -38,8 +40,9 @@ interface GameProps {
 const Game: React.FC<GameProps> = ({ user }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const difficulty = location.state?.difficulty || 'hard'; // Por defecto hard para compatibilidad
-  const { playMusic, stopMusic } = useSettings();
+  const [difficulty, setDifficulty] = useState<'normal' | 'hard'>(() => location.state?.difficulty || 'hard');
+  const [isDifficultyOpen, setIsDifficultyOpen] = useState(false);
+  const { playMusic, stopMusic, settings } = useSettings();
   const [isSurrendering, setIsSurrendering] = useState(false);
 
   useEffect(() => {
@@ -275,6 +278,20 @@ useEffect(() => {
     }
   }, [hp, opponentHp, isLoading]);
 
+  const prevHandRef = useRef<CardData[]>([]);
+  useEffect(() => {
+    if (hand.length > prevHandRef.current.length) {
+      const newCard = hand[hand.length - 1];
+      if (newCard && newCard.suit !== 'jokers') {
+        const urls = getCardSfxUrls(newCard.suit, newCard.rank);
+        if (urls) {
+          playSfxWithFallback(urls.cloudinary, urls.local, settings.sfxVolume);
+        }
+      }
+    }
+    prevHandRef.current = hand;
+  }, [hand, settings.sfxVolume]);
+
   // Manejadores específicos de la UI del jugador
   const handleDrawCard = () => {
     if (voluntad < 1) {
@@ -285,6 +302,8 @@ useEffect(() => {
       setWarningText('La mano está llena');
       return;
     }
+    const genericUrls = getGenericSfxUrls('card_select_ynnwbk.mp3');
+    playSfxWithFallback(genericUrls.cloudinary, genericUrls.local, settings.sfxVolume);
     drawCard(true);
   };
 
@@ -389,7 +408,12 @@ useEffect(() => {
       }
 
       if (gameState.playerAttackedIndices.includes(slotIndex)) return; // ya atacó
-      setSelectedAttackerIndex(prev => prev === slotIndex ? null : slotIndex);
+      const nextAttackerIndex = selectedAttackerIndex === slotIndex ? null : slotIndex;
+      setSelectedAttackerIndex(nextAttackerIndex);
+      if (nextAttackerIndex !== null) {
+        const pickUrls = getGenericSfxUrls('card_pick_hand_cq8xhp.mp3');
+        playSfxWithFallback(pickUrls.cloudinary, pickUrls.local, settings.sfxVolume);
+      }
       setSelectedHandCardIndex(null);
     }
   };
@@ -608,7 +632,12 @@ useEffect(() => {
       setJoker2BoardSlot(null);
       return;
     }
-    setSelectedHandCardIndex(selectedHandCardIndex === i ? null : i);
+    const nextHandCardIndex = selectedHandCardIndex === i ? null : i;
+    setSelectedHandCardIndex(nextHandCardIndex);
+    if (nextHandCardIndex !== null) {
+      const pickUrls = getGenericSfxUrls('card_pick_hand_cq8xhp.mp3');
+      playSfxWithFallback(pickUrls.cloudinary, pickUrls.local, settings.sfxVolume);
+    }
   };
 
   const selectedHandCard = selectedHandCardIndex !== null ? hand[selectedHandCardIndex] : null;
@@ -1346,11 +1375,21 @@ useEffect(() => {
           <GameOverOverlay
             result={gameOver}
             userName={user.name || 'Héroe'}
-            onRestart={handleRestart}
+            onRestart={() => setIsDifficultyOpen(true)}
             onMainMenu={() => navigate('/menu')}
           />
         )}
       </AnimatePresence>
+
+      <DifficultyModal
+        isOpen={isDifficultyOpen}
+        onClose={() => setIsDifficultyOpen(false)}
+        onSelectDifficulty={(selected) => {
+          setDifficulty(selected);
+          setIsDifficultyOpen(false);
+          handleRestart();
+        }}
+      />
 
       {/* MODAL DE CONFIRMACIÓN DE RENDICIÓN */}
       <AnimatePresence>
