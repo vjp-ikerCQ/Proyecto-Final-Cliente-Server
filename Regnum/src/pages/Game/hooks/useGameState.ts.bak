@@ -21,25 +21,12 @@ const canPlaceLadder = (card: CardData, slot: { card: CardData | null; stack: Ca
   return card.rank === slot.card.rank + 1 && slot.card.rank < 12;
 };
 
-export interface CombatLog {
-  id: string;
-  text: string;
-  type: 'attack' | 'heal' | 'system' | 'synergy';
-  timestamp: number;
-}
-
 export interface BoardSlot {
   card: CardData | null;
   stack: CardData[];
 }
 
 export const useGameState = () => {
-  const [combatLogs, setCombatLogs] = useState<CombatLog[]>([]);
-
-  const addLog = (text: string, type: CombatLog['type'] = 'system') => {
-    setCombatLogs(prev => [...prev, { id: Date.now().toString() + Math.random(), text, type, timestamp: Date.now() }]);
-  };
-
   // Estado del Jugador
   const [voluntad, setVoluntad] = useState(10);
   const [hp, setHp] = useState(30);
@@ -248,7 +235,6 @@ export const useGameState = () => {
     if (!targetSlot.card) return;
     const newBoard = [...targetBoard];
     const remaining = targetSlot.card.health - amount;
-    addLog(`¡El ${card.name} hace ${amount} de daño de entrada a ${targetSlot.card.name}!`, 'attack');
     if (remaining <= 0 && targetSlot.stack.length > 0) {
       setDiscardPile(prev => [...prev, ...targetSlot.stack]);
     }
@@ -269,14 +255,12 @@ export const useGameState = () => {
         const newBoard = [...board];
         newBoard[slotIndex] = { card, stack: [card] };
         setBoard(newBoard);
-    addLog(`¡El As de Copas ha curado a '${card.name}' por 3 PV y eliminado estados negativos!`, 'heal');
         setHand(prev => prev.filter((_, i) => i !== handCardIndex));
         applyStartDmg(card, slotIndex, true);
       } else if (canPlaceLadder(card, slot)) {
         // Escalera: apilar carta sobre la existente con bonus de ATK
         const bonus = slot.stack.length; // cards below = bonus for this card
         const stackedCard: CardData = { ...card, ladderBonus: (card.ladderBonus || 0) + bonus };
-        addLog(`¡Escalera! ${card.name} se apila sobre ${slot.card.name}.`, 'system');
         const newBoard = [...board];
         newBoard[slotIndex] = { card: stackedCard, stack: [...slot.stack, stackedCard] };
         setBoard(newBoard);
@@ -306,7 +290,7 @@ export const useGameState = () => {
   };
 
   // Usar Joker (jugador o bot) — la carta joker va a la pila de descartes
-  const activateJoker = (isPlayer: boolean, handCardIndex: number) => {
+  const useJoker = (isPlayer: boolean, handCardIndex: number) => {
     if (isPlayer) {
       const card = hand[handCardIndex];
       if (card.suit !== 'jokers') return;
@@ -492,7 +476,6 @@ export const useGameState = () => {
     if ((targetCard.bleedTurns ?? 0) > 0) effectiveDamage += 1;
 
     const remainingHealth = targetHealth - effectiveDamage;
-    addLog(`${attackerCard.name} ataca a ${targetCard.name} haciendo ${effectiveDamage} de daño.`, 'attack');
 
     // Actualizar tablero defensor con efectos de estado
     const setDefenderBoard = isPlayer ? setOpponentBoard : setBoard;
@@ -637,11 +620,6 @@ export const useGameState = () => {
       const setAttackerAttackedIndices = isPlayer ? setPlayerAttackedIndices : setOpponentAttackedIndices;
       setAttackerAttackedIndices(prev => [...prev, attackerSlotIndex]);
     }
-    if (isAreaAttack) {
-      addLog(`El ${isPlayer ? 'Jugador' : 'Rival'} ha utilizado a '${attackerCard.name}' para atacar en área.`, 'attack');
-    } else {
-      addLog(`El ${isPlayer ? 'Jugador' : 'Rival'} ha utilizado a '${attackerCard.name}' para atacar a '${targetSlot.card.name}'.`, 'attack');
-    }
   };
 
   // Lógica de ataque directo al rival
@@ -767,8 +745,6 @@ export const useGameState = () => {
       const setAttackerAttackedIndices = isPlayer ? setPlayerAttackedIndices : setOpponentAttackedIndices;
       setAttackerAttackedIndices(prev => [...prev, attackerSlotIndex]);
     }
-
-    addLog(`El ${isPlayer ? 'Jugador' : 'Rival'} ha atacado directamente con '${attackerCard.name}' haciendo ${damageNum} de daño.`, 'attack');
   };
 
   const getMaxHealthByRank = (rank: number): number => {
@@ -819,7 +795,6 @@ export const useGameState = () => {
 
     const setAttackerAttackedIndices = isPlayer ? setPlayerAttackedIndices : setOpponentAttackedIndices;
     setAttackerAttackedIndices(prev => [...prev, healerSlotIndex]);
-    addLog(`El ${isPlayer ? 'Jugador' : 'Rival'} ha utilizado a '${healerCard.name}' para curar a '${targetSlot.card.name}' por ${healAmount} PV.`, 'heal');
   };
 
   // Curación del As de Copas: +3 HP, elimina veneno y sangrado (no quita escudo)
@@ -907,7 +882,6 @@ export const useGameState = () => {
       const playerSynergy = detectBoardSynergy(board);
       const opponentSynergy = detectBoardSynergy(opponentBoard);
       const bonus = clerigoPassiveBonus(board);
-      if (bonus > 0) addLog(`Clérigo proporciona ${bonus} de voluntad al jugador.`, 'system');
       const oroBonus = playerSynergy === 'oros' ? 1 : 0;
       setVoluntad(v => Math.min(v + 2 + bonus + oroBonus, 10));
       setPlayerAttackedIndices([]);
@@ -921,7 +895,6 @@ export const useGameState = () => {
       const opponentSynergy = detectBoardSynergy(opponentBoard);
       const playerSynergy = detectBoardSynergy(board);
       const bonus = clerigoPassiveBonus(opponentBoard);
-      if (bonus > 0) addLog(`Clérigo proporciona ${bonus} de voluntad al rival.`, 'system');
       const oroBonus = opponentSynergy === 'oros' ? 1 : 0;
       setOpponentVoluntad(v => Math.min(v + 2 + bonus + oroBonus, 10));
       setOpponentAttackedIndices([]);
@@ -935,8 +908,6 @@ export const useGameState = () => {
   };
 
   return {
-    combatLogs,
-    addLog,
     voluntad,
     setVoluntad,
     hp,
@@ -961,7 +932,7 @@ export const useGameState = () => {
     initializeGame,
     drawCard,
     playCard,
-    activateJoker,
+    useJoker,
     endTurn,
     attackCard,
     attackDirectly,

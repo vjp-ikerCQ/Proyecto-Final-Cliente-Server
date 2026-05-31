@@ -11,17 +11,13 @@ interface BotAIOptions {
   opponentBoard: BoardSlot[];
   deck: CardData[];
   discardPile: CardData[];
-  setOpponentHand: React.Dispatch<React.SetStateAction<CardData[]>>;
-  setDeck: React.Dispatch<React.SetStateAction<CardData[]>>;
-  setOpponentVoluntad: React.Dispatch<React.SetStateAction<number>>;
-  setOpponentBoard: React.Dispatch<React.SetStateAction<BoardSlot[]>>;
   endTurn: (isPlayer: boolean) => void;
   board: BoardSlot[];
   hp: number;
   attackCard: (isPlayer: boolean, attackerSlotIndex: number, targetSlotIndex: number) => void;
   attackDirectly: (isPlayer: boolean, attackerSlotIndex: number) => void;
   healCard: (isPlayer: boolean, healerSlotIndex: number, targetSlotIndex: number) => void;
-  useJoker: (isPlayer: boolean, handCardIndex: number) => void;
+  activateJoker: (isPlayer: boolean, handCardIndex: number) => void;
   playCard: (isPlayer: boolean, slotIndex: number, handCardIndex: number) => void;
   drawCard: (isPlayer: boolean) => void;
   discardCard: (isPlayer: boolean, handCardIndex: number) => void;
@@ -89,17 +85,13 @@ export const useBotAI = ({
   opponentBoard,
   deck,
   discardPile,
-  setOpponentHand: _setOpponentHand,
-  setDeck: _setDeck,
-  setOpponentVoluntad: _setOpponentVoluntad,
-  setOpponentBoard: _setOpponentBoard,
   endTurn,
   board,
   hp,
   attackCard,
   attackDirectly,
   healCard,
-  useJoker,
+  activateJoker,
   playCard,
   drawCard,
   discardCard,
@@ -148,7 +140,7 @@ export const useBotAI = ({
       if (!savingWillpower) {
         const jokerIndex = opponentHand.findIndex(c => c.suit === 'jokers');
         if (jokerIndex !== -1 && opponentVoluntad >= 1) {
-          useJoker(false, jokerIndex);
+          activateJoker(false, jokerIndex);
           actionTaken = true;
         }
       }
@@ -250,9 +242,10 @@ export const useBotAI = ({
 
           if (card.attackType !== 'SOPORTE') {
             let canAttackDir = false;
-            let validTargets: number[] = [];
+            const validTargets: number[] = [];
+            const isAs = card.rank === 1;
             const TARGETING_ROLES = ['ASESINO', 'TANQUE', 'TIRADOR', 'PICARO', 'SOTA'];
-            const isTargeting = TARGETING_ROLES.includes(card.role.toUpperCase()) || isMago;
+            const isTargeting = TARGETING_ROLES.includes(card.role.toUpperCase()) || isMago || isAs;
             const hasPlayerCards = board.some(s => s.card);
 
             if (isMago) {
@@ -357,7 +350,7 @@ export const useBotAI = ({
     hp,
     opponentAttackedIndices,
     opponentMagoAttacks,
-    useJoker,
+    activateJoker,
     playCard,
     drawCard,
     discardCard,
@@ -369,7 +362,9 @@ export const useBotAI = ({
   ]);
 };
 
-export const generateMockBotReply = (playerMessage: string): string => {
+export const generateMockBotReply = (_playerMessage: string): string => {
+  // Use the message to avoid unused variable warning or just ignore it
+  console.log('Bot replying to:', _playerMessage);
   const replies = [
     "¡Vaya, eso fue más útil que una cuchara de oro!",
     "¿De verdad piensas que eso funciona? 😂",

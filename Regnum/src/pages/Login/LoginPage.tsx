@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Lock, Scale, Check, X } from 'lucide-react';
+import { User, Lock, Scale, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import RegisterModal from '../../components/Modal/RegisterModal';
 import GameControls from '../../components/UI/GameControls';

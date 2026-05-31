@@ -156,7 +156,7 @@ const CardGallery: React.FC = () => {
         {['TODAS', 'ESPADAS', 'COPAS', 'OROS', 'BASTOS', 'JOKERS'].map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab as any)}
+            onClick={() => setActiveTab(tab as 'TODAS' | 'ESPADAS' | 'COPAS' | 'OROS' | 'BASTOS' | 'JOKERS')}
             className={`
               relative px-10 py-3 text-xs tracking-widest uppercase transition-all duration-500
               ${activeTab === tab 

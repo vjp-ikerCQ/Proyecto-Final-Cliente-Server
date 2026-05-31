@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import {
   Sword,
   Trophy,
@@ -22,6 +22,11 @@ import GameControls from '../../components/UI/GameControls';
 import FireParticles from '../../components/UI/FireParticles';
 import AtmosphereParticles from '../../components/AtmosphereParticles';
 import { BarChart2 } from 'lucide-react';
+
+import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
+
+import GalleryTransition from '../../components/UI/GalleryTransition';
+import LogoutTransition from '../../components/UI/LogoutTransition';
 
 /**
  * Propiedades para el componente MainMenu
@@ -47,13 +52,22 @@ const CornerDecoration = () => (
  */
 const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
   const { t } = useTranslation();
+  const { playMusic, playSfx } = useSettings();
+  
   // Estados para controlar la visibilidad de los modales
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isRankingsOpen, setIsRankingsOpen] = useState(false);
   const [isDifficultyOpen, setIsDifficultyOpen] = useState(false);
+  const [isGalleryTransitioning, setIsGalleryTransitioning] = useState(false);
+  const [isLogoutTransitioning, setIsLogoutTransitioning] = useState(false);
   
   const navigate = useNavigate();
+
+  // Reproducir música del menú al montar
+  useEffect(() => {
+    playMusic(MUSIC_KEYS.MENU);
+  }, [playMusic]);
 
   const menuItems = [];
 
@@ -79,6 +93,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
    * Maneja las acciones de cada botón del menú
    */
   const handleAction = (id: string) => {
+    playSfx();
     console.log('Menú - Acción pulsada:', id);
     switch (id) {
       case 'new-game':
@@ -88,7 +103,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
         setIsSettingsOpen(true);
         break;
       case 'gallery':
-        navigate('/gallery');
+        setIsGalleryTransitioning(true);
         break;
       case 'rankings':
         setIsRankingsOpen(true);
@@ -97,8 +112,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
         navigate('/admin');
         break;
       case 'exit':
-        // Simulación de salida recargando la página
-        window.location.reload();
+        setIsLogoutTransitioning(true);
         break;
       default:
         console.log('Acción no implementada:', id);
@@ -118,7 +132,10 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
       {/* Botón de Estadísticas (Superior Izquierda) */}
       <div className="absolute top-4 left-4 md:top-8 md:left-8 z-20 animate-fade-in-down">
         <button
-          onClick={() => setIsStatsOpen(true)}
+          onClick={() => {
+            playSfx();
+            setIsStatsOpen(true);
+          }}
           className="p-2 md:p-3 border border-accent-gray bg-panel/50 text-primary-gold hover:bg-primary-gold hover:text-bg-main transition-all duration-300 rounded-sm flex items-center gap-2 group shadow-[0_0_15px_rgba(0,0,0,0.5)]"
           title="Ver Estadísticas"
         >
@@ -157,7 +174,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
           >
             <CornerDecoration />
             <div className={`${item.primary ? 'text-bg-main' : 'text-primary-gold group-hover:text-white'} transition-colors`}>
-              {React.cloneElement(item.icon as any, { size: (typeof window !== 'undefined' && window.innerWidth < 768) ? 14 : 20 })}
+              {React.cloneElement(item.icon as React.ReactElement<{ size?: number }>, { size: (typeof window !== 'undefined' && window.innerWidth < 768) ? 14 : 20 })}
             </div>
             <span className="text-[10px] md:text-base tracking-[0.2em] uppercase font-cinzel">
               {item.text}
@@ -208,9 +225,18 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
             onClose={() => setIsDifficultyOpen(false)}
           />
         )}
+
+        {isGalleryTransitioning && (
+          <GalleryTransition onComplete={() => navigate('/gallery')} />
+        )}
+
+        {isLogoutTransitioning && (
+          <LogoutTransition onComplete={() => navigate('/')} />
+        )}
       </AnimatePresence>
     </div>
   );
 };
 
 export default MainMenu;
+
