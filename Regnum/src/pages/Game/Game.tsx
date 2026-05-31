@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Swords, ArrowLeft, MessageSquare, ScrollText, Menu } from 'lucide-react';
+import { Shield, Swords, ArrowLeft, MessageSquare, ScrollText, Menu, Settings } from 'lucide-react';
 import backCardImage from '../../assets/images/backCard.png';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { type CardData } from '../../utils/cardData';
@@ -18,6 +18,7 @@ import { JokerAnimationOverlay } from './components/JokerAnimationOverlay';
 
 import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
 import SurrenderTransition from '../../components/UI/SurrenderTransition';
+import SettingsModal from '../../components/Modal/SettingsModal';
 
 const MAX_HP = 30;
 
@@ -118,6 +119,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
   const [selectedAttackerIndex, setSelectedAttackerIndex] = useState<number | null>(null);
   const [viewingCard, setViewingCard] = useState<CardData | null>(null);
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
   const [isLogVisible, setIsLogVisible] = useState(false);
   const toggleLog = () => setIsLogVisible(v => !v);
@@ -782,7 +784,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 md:gap-3 px-2">
+        <div className="flex items-center gap-2 md:gap-3 px-2">
           <div className="flex flex-col items-end">
             <span className="text-[6px] md:text-[8px] text-primary-gold uppercase tracking-widest leading-none">V</span>
             <span className="text-sm md:text-lg font-black text-white leading-none">{voluntad}</span>
@@ -796,6 +798,13 @@ const Game: React.FC<GameProps> = ({ user }) => {
               />
             ))}
           </div>
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-1 md:p-1.5 border border-accent-gray bg-panel/50 text-primary-gold hover:bg-primary-gold hover:text-bg-main transition-all duration-300 rounded-sm group shadow-[0_0_10px_rgba(0,0,0,0.4)]"
+            title="Ajustes"
+          >
+            <Settings size={12} className="md:w-3.5 md:h-3.5 group-hover:rotate-45 transition-transform duration-300" />
+          </button>
         </div>
       </header>
 
@@ -1476,6 +1485,15 @@ const Game: React.FC<GameProps> = ({ user }) => {
       <AnimatePresence>
         {isSurrendering && (
           <SurrenderTransition onComplete={() => navigate('/menu')} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <SettingsModal
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+          />
         )}
       </AnimatePresence>
     </motion.div>
