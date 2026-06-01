@@ -164,35 +164,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                   </div>
                 </section>
 
-                {/* Graphics Section */}
-                <section>
-                  <h3 className="text-xs uppercase tracking-[0.3em] text-muted mb-6 border-b border-accent-gray pb-2">Gráficos</h3>
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-400">Calidad de Animaciones</span>
-                      <div className="relative">
-                        <select 
-                          value={settings.animQuality}
-                          onChange={(e) => updateSettings({ ...settings, animQuality: e.target.value as any })}
-                          className="appearance-none bg-secondary-gray border border-accent-gray text-gray-300 text-xs py-2 px-8 font-cinzel focus:outline-none focus:border-primary-gold cursor-pointer"
-                        >
-                          <option value="Baja">Baja</option>
-                          <option value="Media">Media</option>
-                          <option value="Alta">Alta</option>
-                        </select>
-                        <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-400">Efectos de Partículas</span>
-                      <Toggle 
-                        checked={settings.particlesEnabled} 
-                        onChange={() => updateSettings({ ...settings, particlesEnabled: !settings.particlesEnabled })} 
-                      />
-                    </div>
-                  </div>
-                </section>
-
                 {/* Game Section */}
                 <section>
                   <h3 className="text-xs uppercase tracking-[0.3em] text-muted mb-6 border-b border-accent-gray pb-2">Juego</h3>

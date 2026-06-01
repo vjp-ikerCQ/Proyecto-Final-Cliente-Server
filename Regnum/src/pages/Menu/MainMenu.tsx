@@ -24,7 +24,7 @@ import AtmosphereParticles from '../../components/AtmosphereParticles';
 import { BarChart2 } from 'lucide-react';
 
 import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
-import BattleTransition from '../../components/UI/BattleTransition';
+
 import GalleryTransition from '../../components/UI/GalleryTransition';
 import LogoutTransition from '../../components/UI/LogoutTransition';
 
@@ -59,12 +59,8 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isRankingsOpen, setIsRankingsOpen] = useState(false);
   const [isDifficultyOpen, setIsDifficultyOpen] = useState(false);
-
-  // Estados de animaciones de transición
-  const [isTransitioning, setIsTransitioning] = useState(false);
   const [isGalleryTransitioning, setIsGalleryTransitioning] = useState(false);
   const [isLogoutTransitioning, setIsLogoutTransitioning] = useState(false);
-  const [selectedDifficulty, setSelectedDifficulty] = useState<'normal' | 'hard'>('hard');
   
   const navigate = useNavigate();
 
@@ -92,11 +88,6 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
   }
 
   menuItems.push({ id: 'exit', text: t('menu.exit'), icon: <LogOut size={20} />, primary: false });
-
-  const handleDifficultySelect = (difficulty: 'normal' | 'hard') => {
-    setSelectedDifficulty(difficulty);
-    setIsTransitioning(true);
-  };
 
   /**
    * Maneja las acciones de cada botón del menú
@@ -183,7 +174,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
           >
             <CornerDecoration />
             <div className={`${item.primary ? 'text-bg-main' : 'text-primary-gold group-hover:text-white'} transition-colors`}>
-              {React.cloneElement(item.icon as any, { size: (typeof window !== 'undefined' && window.innerWidth < 768) ? 14 : 20 })}
+              {React.cloneElement(item.icon as React.ReactElement<{ size?: number }>, { size: (typeof window !== 'undefined' && window.innerWidth < 768) ? 14 : 20 })}
             </div>
             <span className="text-[10px] md:text-base tracking-[0.2em] uppercase font-cinzel">
               {item.text}
@@ -232,12 +223,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
           <DifficultyModal
             isOpen={isDifficultyOpen}
             onClose={() => setIsDifficultyOpen(false)}
-            onSelectDifficulty={handleDifficultySelect}
           />
-        )}
-
-        {isTransitioning && (
-          <BattleTransition onComplete={() => navigate('/game', { state: { difficulty: selectedDifficulty } })} />
         )}
 
         {isGalleryTransitioning && (
@@ -245,7 +231,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
         )}
 
         {isLogoutTransitioning && (
-          <LogoutTransition onComplete={() => window.location.reload()} />
+          <LogoutTransition onComplete={() => navigate('/')} />
         )}
       </AnimatePresence>
     </div>

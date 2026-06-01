@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Swords, ArrowLeft } from 'lucide-react';
+import { Shield, Swords, ArrowLeft, MessageSquare, ScrollText, Menu, Settings } from 'lucide-react';
 import backCardImage from '../../assets/images/backCard.png';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { type CardData } from '../../utils/cardData';
@@ -12,13 +12,13 @@ import { updateMatchStats } from '../../services/userService';
 import { GameOverOverlay } from './components/GameOverOverlay';
 import { useChat } from './hooks/useChat';
 import { ChatOverlay } from './components/ChatOverlay';
+import { CombatLogOverlay } from './components/CombatLogOverlay';
 import { AttackAnimationOverlay } from './components/AttackAnimationOverlay';
 import { JokerAnimationOverlay } from './components/JokerAnimationOverlay';
 
 import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
 import SurrenderTransition from '../../components/UI/SurrenderTransition';
-import { getCardSfxUrls, playSfxWithFallback, getGenericSfxUrls } from '../../utils/audioHelper';
-import DifficultyModal from '../../components/Modal/DifficultyModal';
+import SettingsModal from '../../components/Modal/SettingsModal';
 
 const MAX_HP = 30;
 
@@ -59,6 +59,8 @@ const Game: React.FC<GameProps> = ({ user }) => {
   // Custom Hooks para estado y bot
   const gameState = useGameState();
   const {
+    combatLogs,
+    addLog,
     voluntad,
     hp,
     hand,
@@ -73,12 +75,8 @@ const Game: React.FC<GameProps> = ({ user }) => {
     initializeGame,
     drawCard,
     playCard,
-    useJoker,
+    activateJoker,
     endTurn,
-    setOpponentHand,
-    setDeck,
-    setOpponentVoluntad,
-    setOpponentBoard,
     playerMagoAttacks,
     hasMagoAttackedTarget,
     playerHasDiscarded,
@@ -92,10 +90,28 @@ const Game: React.FC<GameProps> = ({ user }) => {
     healCardCopa,
   } = gameState;
 
-  const { playerSynergy, opponentSynergy } = useSuitSynergy({
+  const { playerSynergy, opponentSynergy, getBonusForSynergy } = useSuitSynergy({
     playerBoard: board,
     opponentBoard,
   });
+
+  useEffect(() => {
+    if (playerSynergy.isActive && playerSynergy.suit) {
+      const bonus = getBonusForSynergy(playerSynergy);
+      if (bonus) {
+        addLog(`¡Sinergia de ${playerSynergy.suit}! ${bonus.description}`, 'synergy');
+      }
+    }
+  }, [playerSynergy.isActive, playerSynergy.suit]);
+
+  useEffect(() => {
+    if (opponentSynergy.isActive && opponentSynergy.suit) {
+      const bonus = getBonusForSynergy(opponentSynergy);
+      if (bonus) {
+        addLog(`El rival ha activado la Sinergia de ${opponentSynergy.suit}!`, 'synergy');
+      }
+    }
+  }, [opponentSynergy.isActive, opponentSynergy.suit]);
 
 
 
@@ -104,7 +120,11 @@ const Game: React.FC<GameProps> = ({ user }) => {
   const [selectedAttackerIndex, setSelectedAttackerIndex] = useState<number | null>(null);
   const [viewingCard, setViewingCard] = useState<CardData | null>(null);
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
+  const [isLogVisible, setIsLogVisible] = useState(false);
+  const toggleLog = () => setIsLogVisible(v => !v);
+  const [showFabMenu, setShowFabMenu] = useState(false);
   const [warningText, setWarningText] = useState<string | null>(null);
   const [draggingHandIndex, setDraggingHandIndex] = useState<number | null>(null);
   const [isDragOverDiscard, setIsDragOverDiscard] = useState(false);
@@ -159,7 +179,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
     const attackerBoard = isPlayer ? board : opponentBoard;
     const defenderBoard = isPlayer ? opponentBoard : board;
     const attackerCard = attackerBoard[attackerSlotIndex]?.card;
-    
+
     if (!attackerCard) {
       executeAction();
       return;
@@ -212,17 +232,13 @@ const Game: React.FC<GameProps> = ({ user }) => {
     opponentBoard,
     deck,
     discardPile,
-    setOpponentHand,
-    setDeck,
-    setOpponentVoluntad,
-    setOpponentBoard,
     endTurn,
     board,
     hp,
     attackCard: wrappedAttackCard,
     attackDirectly: wrappedAttackDirectly,
     healCard: wrappedHealCard,
-    useJoker: gameState.useJoker,
+    activateJoker: gameState.activateJoker,
     playCard: gameState.playCard,
     drawCard: gameState.drawCard,
     discardCard: gameState.discardCard,
@@ -232,19 +248,19 @@ const Game: React.FC<GameProps> = ({ user }) => {
   });
   const { messages, visible, input, setInput, sendMessage, toggleChat } = useChat();
 
-useEffect(() => {
-  const handler = (e: KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      const active = document.activeElement as HTMLElement;
-      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
-        return;
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        const active = document.activeElement as HTMLElement;
+        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+          return;
+        }
+        toggleChat();
       }
-      toggleChat();
-    }
-  };
-  document.addEventListener('keydown', handler);
-  return () => document.removeEventListener('keydown', handler);
-}, [toggleChat]);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [toggleChat]);
 
   useEffect(() => {
     if (voluntad < 5) {
@@ -424,9 +440,9 @@ useEffect(() => {
       if (isOpponentSlotActiveToAttack(slotIndex)) {
         const isMago = attackerCard?.role.toUpperCase() === 'MAGO';
         const magoAttacksCount = (playerMagoAttacks[selectedAttackerIndex] || []).length;
-        
+
         wrappedAttackCard(true, selectedAttackerIndex, slotIndex);
-        
+
         // Deseleccionar al atacante si no es un Mago, o si ya ha realizado su segundo ataque
         if (!isMago || magoAttacksCount >= 1) {
           setSelectedAttackerIndex(null);
@@ -514,10 +530,10 @@ useEffect(() => {
 
     if (card.rank === 1 || card.rank === 2 || card.rank === 3) {
       setJokerAnim({ card, rank: card.rank });
-      useJoker(true, selectedHandCardIndex);
+      activateJoker(true, selectedHandCardIndex);
       setSelectedHandCardIndex(null);
     } else {
-      useJoker(true, selectedHandCardIndex);
+      activateJoker(true, selectedHandCardIndex);
       setSelectedHandCardIndex(null);
     }
   };
@@ -659,9 +675,9 @@ useEffect(() => {
 
     const isMago = attackerCard.role.toUpperCase() === 'MAGO';
     const hasAlreadyAttackedOnce = isMago && (playerMagoAttacks[selectedAttackerIndex] || []).length > 0;
-    
+
     // Solo verificar costo si no es el segundo ataque de un mago
-    if (!hasAlreadyAttackedOnce && voluntad < attackerCard.cost) return false; 
+    if (!hasAlreadyAttackedOnce && voluntad < attackerCard.cost) return false;
 
     // Si el atacante es un mago, verificar que no haya atacado a este mismo objetivo en este turno
     if (isMago) {
@@ -722,7 +738,7 @@ useEffect(() => {
   };
 
   return (
-    <motion.div 
+    <motion.div
       animate={isShaking ? { x: [-2, 2, -2, 2, 0], y: [-1, 1, -1, 1, 0] } : {}}
       transition={{ duration: 0.4 }}
       className="h-screen w-full bg-bg-main text-text-main overflow-hidden font-spectral flex flex-col relative"
@@ -734,24 +750,24 @@ useEffect(() => {
 
       {/* HEADER */}
       <header className="relative z-20 p-1 md:p-2 lg:p-3 flex flex-col sm:flex-row justify-between items-center gap-1 md:gap-3 border-b border-white/5 bg-black/40 backdrop-blur-md shrink-0">
-      
-      {/* Pantalla de Carga del Duelo */}
-      <AnimatePresence>
-        {isLoading && (
-          <motion.div 
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center gap-6"
-          >
-            <motion.div 
-              animate={{ rotate: 360 }}
-              transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-              className="w-20 h-20 border-t-2 border-primary-gold rounded-full"
-            />
-            <h2 className="text-primary-gold font-cinzel tracking-[0.3em] uppercase text-xl animate-pulse">Preparando Mazo...</h2>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
+        {/* Pantalla de Carga del Duelo */}
+        <AnimatePresence>
+          {isLoading && (
+            <motion.div
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center gap-6"
+            >
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                className="w-20 h-20 border-t-2 border-primary-gold rounded-full"
+              />
+              <h2 className="text-primary-gold font-cinzel tracking-[0.3em] uppercase text-xl animate-pulse">Preparando Mazo...</h2>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <div className="flex justify-between w-full sm:w-auto items-center px-2">
           <button
             onClick={() => setShowSurrenderModal(true)}
@@ -795,7 +811,7 @@ useEffect(() => {
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 md:gap-3 px-2">
+        <div className="flex items-center gap-2 md:gap-3 px-2">
           <div className="flex flex-col items-end">
             <span className="text-[6px] md:text-[8px] text-primary-gold uppercase tracking-widest leading-none">V</span>
             <span className="text-sm md:text-lg font-black text-white leading-none">{voluntad}</span>
@@ -809,6 +825,13 @@ useEffect(() => {
               />
             ))}
           </div>
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-1 md:p-1.5 border border-accent-gray bg-panel/50 text-primary-gold hover:bg-primary-gold hover:text-bg-main transition-all duration-300 rounded-sm group shadow-[0_0_10px_rgba(0,0,0,0.4)]"
+            title="Ajustes"
+          >
+            <Settings size={12} className="md:w-3.5 md:h-3.5 group-hover:rotate-45 transition-transform duration-300" />
+          </button>
         </div>
       </header>
 
@@ -828,13 +851,12 @@ useEffect(() => {
                   animate={{ y: isOppSel ? '-10%' : isSelectable ? '-45%' : '-72%' }}
                   exit={{ y: '-85%', opacity: 0 }}
                   transition={{ type: 'spring', stiffness: 280, damping: 24 }}
-                  className={`relative w-10 sm:w-12 md:w-14 aspect-[2/3] shrink-0 rounded-md border-2 overflow-hidden transition-shadow ${
-                    isOppSel
+                  className={`relative w-10 sm:w-12 md:w-14 aspect-[2/3] shrink-0 rounded-md border-2 overflow-hidden transition-shadow ${isOppSel
                       ? 'border-purple-400 shadow-[0_0_18px_rgba(168,85,247,0.8)] pointer-events-auto cursor-pointer'
                       : isSelectable
                         ? 'border-purple-500/50 pointer-events-auto cursor-pointer hover:border-purple-400/80'
                         : 'border-white/10'
-                  }`}
+                    }`}
                   onClick={() => isSelectable && handleOpponentHandCardClick(i)}
                 >
                   <img src={backCardImage} className="w-full h-full object-cover opacity-80" />
@@ -941,13 +963,12 @@ useEffect(() => {
             onDragLeave={() => setIsDragOverDiscard(false)}
             onDrop={handleDiscardDrop}
           >
-            <div className={`relative w-10 sm:w-16 md:w-20 lg:w-24 aspect-[2/3] rounded-md border-2 overflow-hidden bg-[#080808] transition-all ${
-              isDragOverDiscard && !playerHasDiscarded
+            <div className={`relative w-10 sm:w-16 md:w-20 lg:w-24 aspect-[2/3] rounded-md border-2 overflow-hidden bg-[#080808] transition-all ${isDragOverDiscard && !playerHasDiscarded
                 ? 'border-red-400 bg-red-950/30 shadow-[0_0_12px_rgba(239,68,68,0.3)]'
                 : playerHasDiscarded
                   ? 'border-white/5 opacity-60'
                   : 'border-white/10'
-            }`}>
+              }`}>
               {discardPile.length > 0 ? (
                 <img src={backCardImage} className="w-full h-full object-cover opacity-80" />
               ) : (
@@ -1052,13 +1073,12 @@ useEffect(() => {
             <motion.button
               onClick={handleDiscard}
               disabled={selectedHandCardIndex === null || playerHasDiscarded}
-              className={`flex-1 md:w-full py-2.5 md:py-3 px-4 font-black uppercase tracking-widest rounded border text-[9px] md:text-xs text-center transition-all ${
-                playerHasDiscarded
+              className={`flex-1 md:w-full py-2.5 md:py-3 px-4 font-black uppercase tracking-widest rounded border text-[9px] md:text-xs text-center transition-all ${playerHasDiscarded
                   ? 'bg-transparent text-gray-700 border-white/5 cursor-not-allowed'
                   : selectedHandCardIndex !== null
                     ? 'bg-red-950/60 text-red-300 border-red-800/60 hover:bg-red-900/60 cursor-pointer shadow-[0_0_10px_rgba(239,68,68,0.15)]'
                     : 'bg-transparent text-gray-600 border-white/10 cursor-not-allowed'
-              }`}
+                }`}
             >
               {playerHasDiscarded ? '✓ Descartada' : 'Descartar'}
             </motion.button>
@@ -1066,15 +1086,77 @@ useEffect(() => {
         </div>
       </footer>
 
-        {/* CHAT OVERLAY */}
-        <ChatOverlay
-          messages={messages}
-          visible={visible}
-          input={input}
-          setInput={setInput}
-          sendMessage={sendMessage}
-          toggleChat={toggleChat}
-        />
+      {/* CHAT OVERLAY */}
+
+      {/* FAB para Chat y Log (Mobile) / Botones directos (Desktop) */}
+      <div className="fixed bottom-4 left-4 z-[300] flex flex-col gap-2 items-start">
+        {/* En móvil mostramos un botón de menú que despliega las opciones */}
+        <div className="md:hidden relative">
+          <AnimatePresence>
+            {showFabMenu && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.8 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.8 }}
+                className="absolute bottom-full mb-2 left-0 flex flex-col gap-2"
+              >
+                <button
+                  onClick={() => { toggleChat(); setShowFabMenu(false); }}
+                  className="bg-black/80 border border-white/20 p-3 rounded-full text-white shadow-lg backdrop-blur"
+                >
+                  <MessageSquare size={20} />
+                </button>
+                <button
+                  onClick={() => { toggleLog(); setShowFabMenu(false); }}
+                  className="bg-black/80 border border-primary-gold/50 p-3 rounded-full text-primary-gold shadow-lg backdrop-blur"
+                >
+                  <ScrollText size={20} />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <button
+            onClick={() => setShowFabMenu(v => !v)}
+            className="bg-primary-gold text-black p-3 rounded-full shadow-lg"
+          >
+            <Menu size={24} />
+          </button>
+        </div>
+
+        {/* En escritorio mostramos ambos botones permanentemente */}
+        <div className="hidden md:flex flex-col gap-2">
+          <button
+            onClick={toggleChat}
+            className="bg-black/80 border border-white/20 p-3 rounded-full text-white shadow-lg backdrop-blur hover:bg-white/10 transition"
+            title="Abrir Chat"
+          >
+            <MessageSquare size={20} />
+          </button>
+          <button
+            onClick={toggleLog}
+            className="bg-black/80 border border-primary-gold/50 p-3 rounded-full text-primary-gold shadow-lg backdrop-blur hover:bg-primary-gold/10 transition"
+            title="Abrir Registro de Combate"
+          >
+            <ScrollText size={20} />
+          </button>
+        </div>
+      </div>
+
+      <ChatOverlay
+        messages={messages}
+        visible={visible}
+        input={input}
+        setInput={setInput}
+        sendMessage={sendMessage}
+        toggleChat={toggleChat}
+      />
+
+      <CombatLogOverlay
+        logs={combatLogs}
+        visible={isLogVisible}
+        toggleLog={toggleLog}
+      />
+
       {/* POPUP AS DE COPAS */}
       <AnimatePresence>
         {copaPopupSlot !== null && (() => {
@@ -1105,11 +1187,10 @@ useEffect(() => {
                     setCopaPopupSlot(null);
                     setSelectedAttackerIndex(copaPopupSlot);
                   }}
-                  className={`py-2.5 px-4 rounded-lg border text-[11px] font-black uppercase tracking-widest transition-all ${
-                    blocked
+                  className={`py-2.5 px-4 rounded-lg border text-[11px] font-black uppercase tracking-widest transition-all ${blocked
                       ? 'opacity-30 cursor-not-allowed border-white/10 text-white/30'
                       : 'border-red-500/60 text-red-400 hover:bg-red-950/40 cursor-pointer'
-                  }`}
+                    }`}
                 >
                   ⚔ Atacar
                 </button>
@@ -1121,11 +1202,10 @@ useEffect(() => {
                     setCopaHealSourceSlot(copaPopupSlot);
                     setCopaPopupSlot(null);
                   }}
-                  className={`py-2.5 px-4 rounded-lg border text-[11px] font-black uppercase tracking-widest transition-all ${
-                    blocked
+                  className={`py-2.5 px-4 rounded-lg border text-[11px] font-black uppercase tracking-widest transition-all ${blocked
                       ? 'opacity-30 cursor-not-allowed border-white/10 text-white/30'
                       : 'border-emerald-400/60 text-emerald-300 hover:bg-emerald-950/40 cursor-pointer'
-                  }`}
+                    }`}
                 >
                   ✦ Curar
                 </button>
@@ -1173,11 +1253,10 @@ useEffect(() => {
                     setCaballoPopupSlot(null);
                     setSelectedAttackerIndex(caballoPopupSlot);
                   }}
-                  className={`py-2.5 px-4 rounded-lg border text-[11px] font-black uppercase tracking-widest transition-all ${
-                    hasAttacked
+                  className={`py-2.5 px-4 rounded-lg border text-[11px] font-black uppercase tracking-widest transition-all ${hasAttacked
                       ? 'opacity-30 cursor-not-allowed border-white/10 text-white/30'
                       : 'border-red-500/60 text-red-400 hover:bg-red-950/40 cursor-pointer'
-                  }`}
+                    }`}
                 >
                   ⚔ Atacar
                 </button>
@@ -1188,11 +1267,10 @@ useEffect(() => {
                     setCaballoPopupSlot(null);
                     setCaballoMoveSourceSlot(src);
                   }}
-                  className={`py-2.5 px-4 rounded-lg border text-[11px] font-black uppercase tracking-widest transition-all ${
-                    !canMove
+                  className={`py-2.5 px-4 rounded-lg border text-[11px] font-black uppercase tracking-widest transition-all ${!canMove
                       ? 'opacity-30 cursor-not-allowed border-white/10 text-white/30'
                       : 'border-orange-400/60 text-orange-300 hover:bg-orange-950/40 cursor-pointer'
-                  }`}
+                    }`}
                 >
                   ↔ Moverse
                 </button>
@@ -1411,7 +1489,7 @@ useEffect(() => {
               </div>
               <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter mb-4">¿Abandonar el combate?</h3>
               <p className="text-gray-400 mb-8 leading-relaxed">
-                Si te rindes ahora, la batalla se considerará una <span className="text-red-500 font-bold uppercase">derrota</span> deshonrosa. 
+                Si te rindes ahora, la batalla se considerará una <span className="text-red-500 font-bold uppercase">derrota</span> deshonrosa.
                 <br /><br />
                 ¿Estás seguro de que deseas retirarte a las sombras?
               </p>
@@ -1444,6 +1522,15 @@ useEffect(() => {
       <AnimatePresence>
         {isSurrendering && (
           <SurrenderTransition onComplete={() => navigate('/menu')} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <SettingsModal
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+          />
         )}
       </AnimatePresence>
     </motion.div>
@@ -1576,10 +1663,10 @@ const BoardSlotView: React.FC<{
           : isActiveForCopaHeal
             ? 'border-emerald-400 bg-emerald-400/10 animate-pulse cursor-pointer shadow-[0_0_20px_rgba(52,211,153,0.4)] z-30'
             : isActiveForCaballoMove
-            ? 'border-orange-400 bg-orange-400/10 animate-pulse cursor-pointer shadow-[0_0_20px_rgba(251,146,60,0.4)] z-30'
-            : isActiveToPlay
-            ? 'border-primary-gold bg-primary-gold/10 animate-pulse cursor-pointer shadow-lg'
-            : 'border-white/5 bg-white/[0.01]'}
+              ? 'border-orange-400 bg-orange-400/10 animate-pulse cursor-pointer shadow-[0_0_20px_rgba(251,146,60,0.4)] z-30'
+              : isActiveToPlay
+                ? 'border-primary-gold bg-primary-gold/10 animate-pulse cursor-pointer shadow-lg'
+                : 'border-white/5 bg-white/[0.01]'}
       `}
     >
       <AnimatePresence>
@@ -1594,103 +1681,103 @@ const BoardSlotView: React.FC<{
             onClick={(e) => { e.stopPropagation(); onClick?.(); }}
             onContextMenu={(e) => { e.preventDefault(); onSelect(slot.card!); }}
           >
-          <div
-            className={`w-full h-full relative rounded-md md:rounded-lg border-2 bg-[#080808] transition-all duration-500 group-hover:-translate-y-2 md:group-hover:-translate-y-4 group-hover:z-50`}
-            style={(() => {
-              const synergyColor = synergyGlow ? suitColors[synergyGlow as keyof typeof suitColors] : null;
-              if (isJoker2Target) return { borderColor: '#a855f7', boxShadow: '0 0 18px rgba(168,85,247,0.5)' };
-              if (isAttacking) return { borderColor: '#22c55e', boxShadow: '0 0 15px rgba(34,197,94,0.3)' };
-              if (isActiveToAttack) return { borderColor: '#ef4444', boxShadow: '0 0 15px rgba(239,68,68,0.3)' };
-              if (isActiveToHeal) return { borderColor: '#22c55e', boxShadow: '0 0 15px rgba(34,197,94,0.3)' };
-              if (synergyColor) return {
-                borderColor: synergyColor,
-                boxShadow: `0 0 18px ${synergyColor}99, 0 0 40px ${synergyColor}44`,
-              };
-              return { borderColor: `${suitColors[slot.card.suit]}88`, boxShadow: `0 0 15px ${suitColors[slot.card.suit]}11` };
-            })()}
-          >
-            <div className="w-full h-full overflow-hidden relative rounded-[inherit]">
-              <img src={slot.card.image} className="w-full h-full object-cover" />
-
-              {/* OVERLAY ESTILO GALERIA (COMPLETO) */}
-              <div className="absolute inset-0 bg-black/85 backdrop-blur-[3px] opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col p-2 md:p-4 overflow-y-auto scrollbar-hide">
-                {/* Rol Central con rallas */}
-                <div className="flex-1 flex flex-col items-center justify-center text-center">
-                  <div className="w-4 md:w-10 h-px bg-white/20 mb-1 md:mb-2" />
-                  <span className="text-[6px] md:text-[10px] uppercase tracking-[0.2em] md:tracking-[0.4em] text-white/50 font-cinzel leading-none">
-                    {slot.card.role}
-                  </span>
-                  <div className="w-4 md:w-10 h-px bg-white/20 mt-1 md:mt-2" />
-                </div>
-
-                {/* Info inferior: Nombre, Stats y Descripción */}
-                <div className="mt-auto text-center md:text-left">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-[6px] md:text-[10px] text-white/70 uppercase">
-                      ATK: {slot.card.ladderBonus ? `${slot.card.attack}+${slot.card.ladderBonus}` : slot.card.attack}
-                    </span>
-                    <span className="text-[6px] md:text-[10px] text-white/70 uppercase">HP: {slot.card.health}</span>
-                  </div>
-                  <div className="border-t border-white/10 pt-1 md:pt-2">
-                    <p className="text-[5px] md:text-[9px] text-gray-400 italic leading-tight line-clamp-3 md:line-clamp-none">
-                      {slot.card.effect}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="absolute bottom-0 left-0 right-0 p-1 md:p-2 bg-gradient-to-t from-black to-transparent flex justify-between items-center group-hover:opacity-0 transition-opacity">
-                <span className="text-red-500 font-bold text-[8px] md:text-xs">
-                  {slot.card.ladderBonus ? `${slot.card.attack}+${slot.card.ladderBonus}` : slot.card.attack}
-                </span>
-                <span className="text-blue-400 font-bold text-[8px] md:text-xs">{slot.card.health}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Indicador de costo de voluntad en el tablero */}
-          <div className="absolute -top-1 -right-1 md:-top-2 md:-right-2 z-[60]">
             <div
-              className="w-4 h-4 md:w-7 md:h-7 rounded-full bg-black/95 backdrop-blur-md flex items-center justify-center border md:border-2 shadow-2xl"
-              style={{ borderColor: suitColors[slot.card.suit] }}
+              className={`w-full h-full relative rounded-md md:rounded-lg border-2 bg-[#080808] transition-all duration-500 group-hover:-translate-y-2 md:group-hover:-translate-y-4 group-hover:z-50`}
+              style={(() => {
+                const synergyColor = synergyGlow ? suitColors[synergyGlow as keyof typeof suitColors] : null;
+                if (isJoker2Target) return { borderColor: '#a855f7', boxShadow: '0 0 18px rgba(168,85,247,0.5)' };
+                if (isAttacking) return { borderColor: '#22c55e', boxShadow: '0 0 15px rgba(34,197,94,0.3)' };
+                if (isActiveToAttack) return { borderColor: '#ef4444', boxShadow: '0 0 15px rgba(239,68,68,0.3)' };
+                if (isActiveToHeal) return { borderColor: '#22c55e', boxShadow: '0 0 15px rgba(34,197,94,0.3)' };
+                if (synergyColor) return {
+                  borderColor: synergyColor,
+                  boxShadow: `0 0 18px ${synergyColor}99, 0 0 40px ${synergyColor}44`,
+                };
+                return { borderColor: `${suitColors[slot.card.suit]}88`, boxShadow: `0 0 15px ${suitColors[slot.card.suit]}11` };
+              })()}
             >
-              <span className="text-[7px] md:text-xs font-bold" style={{ color: suitColors[slot.card.suit] }}>{slot.card.cost}</span>
-            </div>
-          </div>
+              <div className="w-full h-full overflow-hidden relative rounded-[inherit]">
+                <img src={slot.card.image} className="w-full h-full object-cover" />
 
-          {slot.stack.length > 1 && (
-            <div className="group/ladder absolute -bottom-2 -left-2 z-50">
-              <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-amber-500/90 text-black flex items-center justify-center font-black text-[8px] md:text-[10px] border border-amber-300 shadow-[0_0_8px_rgba(251,191,36,0.8)] cursor-default select-none">
-                {slot.stack.length}
-              </div>
-              <div className="absolute bottom-full left-0 mb-1 hidden group-hover/ladder:block pointer-events-none">
-                <div className="bg-black/90 border border-amber-500/50 rounded px-2 py-1 text-[8px] md:text-[9px] text-amber-400 font-bold uppercase tracking-wide whitespace-nowrap">
-                  Escalera de {slot.stack.length}: +{slot.stack.length - 1} ATK extra
-                </div>
-              </div>
-            </div>
-          )}
+                {/* OVERLAY ESTILO GALERIA (COMPLETO) */}
+                <div className="absolute inset-0 bg-black/85 backdrop-blur-[3px] opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col p-2 md:p-4 overflow-y-auto scrollbar-hide">
+                  {/* Rol Central con rallas */}
+                  <div className="flex-1 flex flex-col items-center justify-center text-center">
+                    <div className="w-4 md:w-10 h-px bg-white/20 mb-1 md:mb-2" />
+                    <span className="text-[6px] md:text-[10px] uppercase tracking-[0.2em] md:tracking-[0.4em] text-white/50 font-cinzel leading-none">
+                      {slot.card.role}
+                    </span>
+                    <div className="w-4 md:w-10 h-px bg-white/20 mt-1 md:mt-2" />
+                  </div>
 
-          {/* Indicadores de estado: escudo, veneno, sangrado */}
-          {(slot.card.shield || !!slot.card.poisonTurns || !!slot.card.bleedTurns) && (
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-40 flex flex-col gap-0.5 items-center pointer-events-none">
-              {slot.card.shield && (
-                <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-yellow-400 border border-yellow-200 flex items-center justify-center shadow-[0_0_6px_rgba(234,179,8,0.8)]" title="Escudo">
-                  <span className="text-[6px] md:text-[8px] leading-none select-none">🛡</span>
+                  {/* Info inferior: Nombre, Stats y Descripción */}
+                  <div className="mt-auto text-center md:text-left">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[6px] md:text-[10px] text-white/70 uppercase">
+                        ATK: {slot.card.ladderBonus ? `${slot.card.attack}+${slot.card.ladderBonus}` : slot.card.attack}
+                      </span>
+                      <span className="text-[6px] md:text-[10px] text-white/70 uppercase">HP: {slot.card.health}</span>
+                    </div>
+                    <div className="border-t border-white/10 pt-1 md:pt-2">
+                      <p className="text-[5px] md:text-[9px] text-gray-400 italic leading-tight line-clamp-3 md:line-clamp-none">
+                        {slot.card.effect}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              )}
-              {!!slot.card.poisonTurns && (
-                <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-purple-600 border border-purple-400 flex items-center justify-center shadow-[0_0_6px_rgba(147,51,234,0.8)]" title={`Veneno (${slot.card.poisonTurns} turnos)`}>
-                  <span className="text-[6px] md:text-[8px] leading-none select-none font-bold text-white">{slot.card.poisonTurns}</span>
+
+                <div className="absolute bottom-0 left-0 right-0 p-1 md:p-2 bg-gradient-to-t from-black to-transparent flex justify-between items-center group-hover:opacity-0 transition-opacity">
+                  <span className="text-red-500 font-bold text-[8px] md:text-xs">
+                    {slot.card.ladderBonus ? `${slot.card.attack}+${slot.card.ladderBonus}` : slot.card.attack}
+                  </span>
+                  <span className="text-blue-400 font-bold text-[8px] md:text-xs">{slot.card.health}</span>
                 </div>
-              )}
-              {!!slot.card.bleedTurns && (
-                <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-red-600 border border-red-400 flex items-center justify-center shadow-[0_0_6px_rgba(220,38,38,0.8)]" title="Sangrado">
-                  <span className="text-[6px] md:text-[8px] leading-none select-none">🩸</span>
-                </div>
-              )}
+              </div>
             </div>
-          )}
+
+            {/* Indicador de costo de voluntad en el tablero */}
+            <div className="absolute -top-1 -right-1 md:-top-2 md:-right-2 z-[60]">
+              <div
+                className="w-4 h-4 md:w-7 md:h-7 rounded-full bg-black/95 backdrop-blur-md flex items-center justify-center border md:border-2 shadow-2xl"
+                style={{ borderColor: suitColors[slot.card.suit] }}
+              >
+                <span className="text-[7px] md:text-xs font-bold" style={{ color: suitColors[slot.card.suit] }}>{slot.card.cost}</span>
+              </div>
+            </div>
+
+            {slot.stack.length > 1 && (
+              <div className="group/ladder absolute -bottom-2 -left-2 z-50">
+                <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-amber-500/90 text-black flex items-center justify-center font-black text-[8px] md:text-[10px] border border-amber-300 shadow-[0_0_8px_rgba(251,191,36,0.8)] cursor-default select-none">
+                  {slot.stack.length}
+                </div>
+                <div className="absolute bottom-full left-0 mb-1 hidden group-hover/ladder:block pointer-events-none">
+                  <div className="bg-black/90 border border-amber-500/50 rounded px-2 py-1 text-[8px] md:text-[9px] text-amber-400 font-bold uppercase tracking-wide whitespace-nowrap">
+                    Escalera de {slot.stack.length}: +{slot.stack.length - 1} ATK extra
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Indicadores de estado: escudo, veneno, sangrado */}
+            {(slot.card.shield || !!slot.card.poisonTurns || !!slot.card.bleedTurns) && (
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-40 flex flex-col gap-0.5 items-center pointer-events-none">
+                {slot.card.shield && (
+                  <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-yellow-400 border border-yellow-200 flex items-center justify-center shadow-[0_0_6px_rgba(234,179,8,0.8)]" title="Escudo">
+                    <span className="text-[6px] md:text-[8px] leading-none select-none">🛡</span>
+                  </div>
+                )}
+                {!!slot.card.poisonTurns && (
+                  <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-purple-600 border border-purple-400 flex items-center justify-center shadow-[0_0_6px_rgba(147,51,234,0.8)]" title={`Veneno (${slot.card.poisonTurns} turnos)`}>
+                    <span className="text-[6px] md:text-[8px] leading-none select-none font-bold text-white">{slot.card.poisonTurns}</span>
+                  </div>
+                )}
+                {!!slot.card.bleedTurns && (
+                  <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-red-600 border border-red-400 flex items-center justify-center shadow-[0_0_6px_rgba(220,38,38,0.8)]" title="Sangrado">
+                    <span className="text-[6px] md:text-[8px] leading-none select-none">🩸</span>
+                  </div>
+                )}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

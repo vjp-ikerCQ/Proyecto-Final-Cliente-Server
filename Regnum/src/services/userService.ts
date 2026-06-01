@@ -43,7 +43,7 @@ export const getRankings = async (): Promise<RankingEntry[]> => {
 
     if (data.success) {
       // Mapeamos los datos del backend al formato que espera el frontend
-      return data.leaderboard.map((user: any, index: number) => ({
+      return data.leaderboard.map((user: { nombre: string; estadisticas?: { partidasGanadas: number } }, index: number) => ({
         id: user.nombre, // Usamos el nombre como ID si no hay uno único expuesto
         name: user.nombre,
         wins: user.estadisticas?.partidasGanadas || 0,
