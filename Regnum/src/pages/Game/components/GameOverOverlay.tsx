@@ -65,12 +65,12 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
       const victoryMusic = new Audio('https://res.cloudinary.com/drvgncidb/video/upload/Assets/Folders/Home/regnumhollow/winning-loop.mp3');
       victoryMusic.volume = volume;
       victoryMusic.loop = true;
-      victoryMusic.play().catch(() => { });
+      victoryMusic.play().catch(() => {});
     } else {
       // Defeat SFX
       const defeatSfx = new Audio('https://res.cloudinary.com/drvgncidb/video/upload/Assets/Folders/Home/regnumhollow/mixkit-circus-lose.wav');
       defeatSfx.volume = volume;
-      defeatSfx.play().catch(() => { });
+      defeatSfx.play().catch(() => {});
 
       // Random narrator voice lines
       const voices = [
@@ -80,7 +80,7 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
       ];
       const voice = new Audio(voices[Math.floor(Math.random() * voices.length)]);
       voice.volume = volume;
-      setTimeout(() => { voice.play().catch(() => { }); }, 800);
+      setTimeout(() => { voice.play().catch(() => {}); }, 800);
     }
   }, [result, settings.sfxVolume]);
 
@@ -416,9 +416,8 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
     },
   };
 
-
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-[3px] overflow-hidden font-spectral">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 overflow-hidden font-spectral">
       {/* Canvas para partículas interactivas */}
       <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none z-10" />
 
@@ -427,121 +426,112 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className={`relative max-w-md w-full z-20 p-8 md:p-10 border text-center backdrop-blur-xl shadow-[0_0_50px_rgba(0,0,0,0.9)] overflow-hidden ${isVic
-            ? 'bg-[#080d08]/85 border-primary-gold/45 shadow-[0_0_40px_rgba(166,138,100,0.2)]'
-            : 'bg-[#0a0505]/95 border-red-950/45 shadow-[0_0_40px_rgba(220,38,38,0.15)]'
-          }`}
+        className={`relative max-w-lg w-full z-20 p-8 md:p-12 rounded-3xl border text-center backdrop-blur-xl shadow-[0_0_80px_rgba(0,0,0,0.9)] overflow-hidden ${
+          isVic
+            ? 'bg-[#080d08]/75 border-primary-gold/45 shadow-[0_0_50px_rgba(166,138,100,0.15)]'
+            : 'bg-[#0f0909]/75 border-red-950/45 shadow-[0_0_50px_rgba(220,38,38,0.1)]'
+        }`}
       >
         {/* Adornos esquineros estilo manuscrito medieval */}
-        {isVic ? (
-          <>
-            <div className="absolute top-2 left-2 w-8 h-8 border-t-2 border-l-2 opacity-35 border-primary-gold" />
-            <div className="absolute top-2 right-2 w-8 h-8 border-t-2 border-r-2 opacity-35 border-primary-gold" />
-            <div className="absolute bottom-2 left-2 w-8 h-8 border-b-2 border-l-2 opacity-35 border-primary-gold" />
-            <div className="absolute bottom-2 right-2 w-8 h-8 border-b-2 border-r-2 opacity-35 border-primary-gold" />
-          </>
-        ) : (
-          <>
-            <div className="absolute top-0 left-0 w-4 h-4 border-t border-l border-red-600/60" />
-            <div className="absolute top-0 right-0 w-4 h-4 border-t border-r border-red-600/60" />
-            <div className="absolute bottom-0 left-0 w-4 h-4 border-b border-l border-red-600/60" />
-            <div className="absolute bottom-0 right-0 w-4 h-4 border-b border-r border-red-600/60" />
-          </>
-        )}
+        <div className={`absolute top-2 left-2 w-8 h-8 border-t-2 border-l-2 opacity-35 ${isVic ? 'border-primary-gold' : 'border-red-700'}`} />
+        <div className={`absolute top-2 right-2 w-8 h-8 border-t-2 border-r-2 opacity-35 ${isVic ? 'border-primary-gold' : 'border-red-700'}`} />
+        <div className={`absolute bottom-2 left-2 w-8 h-8 border-b-2 border-l-2 opacity-35 ${isVic ? 'border-primary-gold' : 'border-red-700'}`} />
+        <div className={`absolute bottom-2 right-2 w-8 h-8 border-b-2 border-r-2 opacity-35 ${isVic ? 'border-primary-gold' : 'border-red-700'}`} />
 
         {/* 1. Emblem Medallón central */}
-        {isVic ? (
-          <motion.div variants={badgeVariants} className="flex justify-center mb-6 relative">
-            <div className="absolute w-32 h-32 rounded-full filter blur-2xl opacity-45 -z-10 animate-pulse bg-primary-gold/30" />
-            <motion.div
-              variants={crownSparkleVariants}
-              animate="animate"
-              className="w-24 h-24 rounded-full flex items-center justify-center border-2 shadow-inner bg-gradient-to-b from-[#1c1813] to-[#0c0a08] border-primary-gold/60 shadow-[0_0_20px_rgba(166,138,100,0.3)]"
-            >
+        <motion.div variants={badgeVariants} className="flex justify-center mb-6 relative">
+          {/* Brillos mágicos tras el emblema */}
+          <div
+            className={`absolute w-32 h-32 rounded-full filter blur-2xl opacity-45 -z-10 animate-pulse ${
+              isVic ? 'bg-primary-gold/30' : 'bg-red-600/20'
+            }`}
+          />
+
+          <motion.div
+            variants={isVic ? crownSparkleVariants : skullBurnVariants}
+            animate="animate"
+            className={`w-24 h-24 rounded-full flex items-center justify-center border-2 shadow-inner bg-gradient-to-b ${
+              isVic
+                ? 'from-[#1c1813] to-[#0c0a08] border-primary-gold/60 shadow-[0_0_20px_rgba(166,138,100,0.3)]'
+                : 'from-[#1a0e0e] to-[#0b0505] border-red-900/60 shadow-[0_0_20px_rgba(220,38,38,0.2)]'
+            }`}
+          >
+            {isVic ? (
               <Crown className="w-12 h-12 text-[#ffcc00] filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]" />
-            </motion.div>
+            ) : (
+              <Skull className="w-12 h-12 text-red-500 filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]" />
+            )}
           </motion.div>
-        ) : (
-          <div className="flex justify-center mb-6 relative">
-            <div className="absolute w-32 h-32 rounded-full filter blur-2xl opacity-45 -z-10 animate-pulse bg-red-600/20" />
-            <div className="w-20 h-20 rounded-full flex items-center justify-center border border-red-500/40 bg-red-950/20 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
-              <Skull className="w-10 h-10 text-red-500" />
-            </div>
-          </div>
-        )}
+        </motion.div>
 
         {/* 2. Título de Victoria o Derrota */}
-        <h1
-          className={`text-4xl md:text-5xl font-cinzel font-black tracking-widest mb-2 ${isVic
-              ? 'text-gold-gradient drop-shadow-[0_3px_6px_rgba(0,0,0,0.8)]'
-              : 'text-red-600'
-            }`}
+        <motion.h1
+          variants={itemVariants}
+          className={`text-5xl md:text-7xl font-cinzel font-black tracking-[0.08em] mb-4 drop-shadow-[0_3px_6px_rgba(0,0,0,0.8)] ${
+            isVic
+              ? 'text-gold-gradient bg-clip-text'
+              : 'text-transparent bg-gradient-to-b from-red-500 via-red-600 to-red-800 bg-clip-text'
+          }`}
+          style={{
+            WebkitBackgroundClip: 'text',
+          }}
         >
           {isVic ? 'VICTORIA' : 'DERROTA'}
-        </h1>
+        </motion.h1>
 
-        {/* Separador de línea con florón / icono */}
-        <div className="flex items-center justify-center gap-3 my-2 opacity-75">
+        {/* Separador de línea con florón */}
+        <motion.div variants={itemVariants} className="flex items-center justify-center gap-3 my-4 opacity-75">
+          <div className={`h-px w-16 bg-gradient-to-r ${isVic ? 'from-transparent to-primary-gold' : 'from-transparent to-red-600'}`} />
           {isVic ? (
-            <>
-              <div className="h-px w-16 bg-gradient-to-r from-transparent to-primary-gold" />
-              <Trophy className="w-3.5 h-3.5 text-primary-gold" />
-              <div className="h-px w-16 bg-gradient-to-l from-transparent to-primary-gold" />
-            </>
+            <Trophy className="w-3.5 h-3.5 text-primary-gold" />
           ) : (
-            <Flame className="w-4 h-4 text-red-500" />
+            <Flame className="w-3.5 h-3.5 text-red-500" />
           )}
-        </div>
+          <div className={`h-px w-16 bg-gradient-to-l ${isVic ? 'from-transparent to-primary-gold' : 'from-transparent to-red-600'}`} />
+        </motion.div>
 
         {/* 3. Mensaje e Historial/Contexto del jugador */}
-        <div className="space-y-2 mb-8 max-w-sm mx-auto">
-          {isVic ? (
-            <>
-              <h3 className="text-white text-lg font-cinzel uppercase tracking-[0.2em] font-semibold">
-                ¡Larga vida, Sir {userName}!
-              </h3>
-              <p className="text-gray-400 text-sm leading-relaxed font-spectral">
-                Has demostrado una destreza táctica legendaria en el tablero. Tu nombre se cantará en las tabernas de todo Regnum por generaciones.
-              </p>
-            </>
-          ) : (
-            <>
-              <h3 className="text-white text-sm font-cinzel uppercase tracking-[0.15em] font-bold">
-                TU REINO HA CAÍDO, {userName.toUpperCase()}
-              </h3>
-              <p className="text-gray-400 text-[11px] font-spectral leading-relaxed my-4 italic">
-                La implacable voluntad del enemigo ha prevalecido sobre tu ejército. Los estandartes se han quemado y la oscuridad acecha el trono.
-              </p>
-            </>
-          )}
-        </div>
+        <motion.div variants={itemVariants} className="space-y-3 mb-10 max-w-sm mx-auto">
+          <h3 className="text-white text-lg font-cinzel uppercase tracking-[0.2em] font-semibold">
+            {isVic ? `¡Larga vida, Sir ${userName}!` : `Tu reino ha caído, ${userName}`}
+          </h3>
+          <p className="text-gray-400 text-sm leading-relaxed font-spectral">
+            {isVic
+              ? 'Has demostrado una destreza táctica legendaria en el tablero. Tu nombre se cantará en las tabernas de todo Regnum por generaciones.'
+              : 'La implacable voluntad del enemigo ha prevalecido sobre tu ejército. Los estandartes se han quemado y la oscuridad acecha el trono.'}
+          </p>
+        </motion.div>
 
         {/* 4. Botones de acción */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+        <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-4 justify-center items-center">
           {/* Botón Volver a Jugar */}
-          <button
+          <motion.button
+            whileHover={{ scale: 1.04, y: -2 }}
+            whileTap={{ scale: 0.97 }}
             onClick={onRestart}
-            className={`relative flex items-center justify-center gap-2.5 w-full sm:flex-1 py-3 px-6 font-cinzel font-black uppercase tracking-wider text-[11px] rounded transition-all duration-300 shadow-md cursor-pointer active:scale-95 ${isVic
-                ? 'bg-gradient-to-b from-[#d4bb92]/20 to-[#a68a64]/10 text-primary-gold border border-primary-gold/50 hover:border-primary-gold hover:shadow-[0_0_20px_rgba(166,138,100,0.3)]'
-                : 'bg-[#1f0d0d] hover:bg-[#2c1313] border border-red-800 text-red-400 hover:text-red-300 shadow-[0_0_15px_rgba(239,68,68,0.25)]'
-              }`}
+            className={`relative flex items-center justify-center gap-2.5 w-full sm:flex-1 py-4 px-8 font-cinzel font-black uppercase tracking-[0.2em] text-[11px] rounded-lg border transition-all duration-300 shadow-lg cursor-pointer ${
+              isVic
+                ? 'bg-gradient-to-b from-[#d4bb92]/20 to-[#a68a64]/10 text-primary-gold border-primary-gold/50 hover:border-primary-gold hover:shadow-[0_0_20px_rgba(166,138,100,0.3)]'
+                : 'bg-gradient-to-b from-red-950/40 to-red-950/20 text-red-400 border-red-900/40 hover:border-red-500 hover:text-red-300 hover:shadow-[0_0_20px_rgba(220,38,38,0.25)]'
+            }`}
           >
             <RotateCcw className="w-4 h-4" />
             <span>Volver a Jugar</span>
-          </button>
+            {/* Sheen de luz animado en hover */}
+            <div className="absolute inset-0 -translate-x-full hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent pointer-events-none" />
+          </motion.button>
 
           {/* Botón Menú Principal */}
-          <button
+          <motion.button
+            whileHover={{ scale: 1.04, y: -2 }}
+            whileTap={{ scale: 0.97 }}
             onClick={onMainMenu}
-            className={`flex items-center justify-center gap-2.5 w-full sm:flex-1 py-3 px-6 font-cinzel uppercase tracking-wider text-[11px] rounded transition-all duration-300 shadow-md cursor-pointer active:scale-95 ${isVic
-                ? 'bg-white/[0.03] text-gray-300 border border-white/10 hover:bg-white/[0.08] hover:text-white hover:border-white/20'
-                : 'bg-[#121212] hover:bg-[#1a1a1a] border border-[#2d2d2d] text-gray-300 hover:text-white'
-              }`}
+            className="flex items-center justify-center gap-2.5 w-full sm:flex-1 py-4 px-8 font-cinzel font-semibold uppercase tracking-[0.2em] text-[11px] bg-white/[0.03] text-gray-300 rounded-lg border border-white/10 hover:bg-white/[0.08] hover:text-white hover:border-white/20 transition-all duration-300 shadow-md cursor-pointer"
           >
             <Home className="w-4 h-4" />
             <span>Menú Principal</span>
-          </button>
-        </div>
+          </motion.button>
+        </motion.div>
       </motion.div>
     </div>
   );

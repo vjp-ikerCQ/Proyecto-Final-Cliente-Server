@@ -1,47 +1,24 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
+import { useSettings } from '../../contexts/SettingsContext';
 
 const SPLASH_MUSIC_URL = 'https://res.cloudinary.com/drvgncidb/video/upload/Assets/Folders/Home/regnumhollow/splash2.mp3';
 
 const SplashPage: React.FC = () => {
   const navigate = useNavigate();
-  const { playMusic } = useSettings();
+  const { playMusic, stopMusic } = useSettings();
 
-  // Play splash music after 250ms delay or upon first user interaction
+  // Play splash music after 250ms delay
   useEffect(() => {
-    const playAttempt = () => {
+    const timer = setTimeout(() => {
       playMusic(SPLASH_MUSIC_URL);
-    };
-
-    const timer = setTimeout(playAttempt, 250);
-
-    const unlockAudio = () => {
-      playAttempt();
-      cleanup();
-    };
-
-    const cleanup = () => {
-      window.removeEventListener('keydown', unlockAudio);
-      window.removeEventListener('pointerdown', unlockAudio);
-      window.removeEventListener('touchstart', unlockAudio);
-      window.removeEventListener('mousemove', unlockAudio);
-    };
-
-    window.addEventListener('keydown', unlockAudio);
-    window.addEventListener('pointerdown', unlockAudio);
-    window.addEventListener('touchstart', unlockAudio);
-    window.addEventListener('mousemove', unlockAudio);
-
-    return () => {
-      clearTimeout(timer);
-      cleanup();
-    };
+    }, 250);
+    return () => clearTimeout(timer);
   }, [playMusic]);
 
   const handleStart = () => {
-    playMusic(MUSIC_KEYS.MENU);
+    stopMusic();
     navigate('/login');
   };
 

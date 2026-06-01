@@ -1,37 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
 import { type CardData } from '../../../utils/cardData';
-import { useSettings } from '../../../contexts/SettingsContext';
-import { getAttackSfxUrls, playSfxWithFallback } from '../../../utils/audioHelper';
-
-const getAttackSfxFile = (role: string, rank: number, suit: string, isHeal: boolean) => {
-  if (isHeal) return 'attack_orb_w2rbj3.wav';
-  if (rank === 1) {
-    if (suit === 'oros') return 'attack_thunder_jxnbdd.wav';
-    if (suit === 'copas') return 'attack_fulthim_wsmqob.wav';
-    if (suit === 'espadas') return 'attack_slash_mtslrj.wav';
-    if (suit === 'bastos') return 'attack_take_rmpvvw.wav';
-  }
-  if (role === 'REY') return 'attack_thunder_jxnbdd.wav';
-  if (role === 'ASESINO') return 'attack_slash_mtslrj.wav';
-  if (role === 'BESTIA' || role === 'PERRO' || role === 'JABALI' || role === 'SERPIENTE' || role === 'TORO') return 'attack_slash_mtslrj.wav';
-  if (role === 'TANQUE') return 'attack_take_rmpvvw.wav';
-  if (role === 'TIRADOR') return 'attack_4dot_blgg4w.wav';
-  if (role === 'PICARO') return 'attack_swap_c2ahx3.wav';
-  if (role === 'MAGO') return 'attack_thunder_jxnbdd.wav';
-  if (role === 'SOTA') return 'attack_slash_mtslrj.wav';
-  if (role === 'CABALLO') return 'attack_slash_mtslrj.wav';
-  
-  const randomList = [
-    'attack_slash_mtslrj.wav',
-    'attack_take_rmpvvw.wav',
-    'attack_4dot_blgg4w.wav',
-    'attack_banish_rpqru6.wav',
-    'attack_fulthim_wsmqob.wav',
-    'attack_orb_w2rbj3.wav'
-  ];
-  return randomList[Math.floor(Math.random() * randomList.length)];
-};
 
 interface AttackAnimationOverlayProps {
   attackerCard: CardData;
@@ -55,8 +24,6 @@ export const AttackAnimationOverlay: React.FC<AttackAnimationOverlayProps> = ({
   onComplete,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { settings } = useSettings();
-
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -160,11 +127,6 @@ export const AttackAnimationOverlay: React.FC<AttackAnimationOverlayProps> = ({
         const role = attackerCard.role.toUpperCase();
         const rank = attackerCard.rank;
         const suit = attackerCard.suit;
-
-        // Play sound effect for the attack
-        const attackSfxFile = getAttackSfxFile(role, rank, suit, isHeal);
-        const sfxUrls = getAttackSfxUrls(attackSfxFile);
-        playSfxWithFallback(sfxUrls.cloudinary, sfxUrls.local, settings.sfxVolume);
 
         // Color del palo para acentos estéticos
         const suitColorHex =

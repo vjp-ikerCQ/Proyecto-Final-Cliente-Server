@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { User, Lock, Scale, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import RegisterModal from '../../components/Modal/RegisterModal';
 import GameControls from '../../components/UI/GameControls';
-import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
 
 interface LoginPageProps {
   onLogin: (name: string, isGuest: boolean) => void;
@@ -11,11 +10,6 @@ interface LoginPageProps {
 
 const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const { t } = useTranslation();
-  const { playMusic } = useSettings();
-
-  useEffect(() => {
-    playMusic(MUSIC_KEYS.MENU);
-  }, [playMusic]);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
