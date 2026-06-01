@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, X, ChevronLeft, ChevronRight, Volume2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { type CardData } from '../../utils/cardData';
 import { fetchCards } from '../../services/cardsService';
+import { useSettings } from '../../contexts/SettingsContext';
+import { playCardSfx } from '../../utils/cardAudioMap';
 
 /**
  * Colores representativos para cada palo de la baraja
@@ -15,7 +17,6 @@ const suitColors = {
   bastos: '#00ff66',
   jokers: '#a855f7',
 };
-
 
 /**
  * Sub-componente reutilizable para una carta individual en la galería.
@@ -78,6 +79,7 @@ const CardTile: React.FC<{ card: CardData; onClick: () => void }> = ({ card, onC
  */
 const CardGallery: React.FC = () => {
   const navigate = useNavigate();
+  const { playSfx } = useSettings();
   const [activeTab, setActiveTab] = useState<'TODAS' | 'ESPADAS' | 'COPAS' | 'OROS' | 'BASTOS' | 'JOKERS'>('TODAS');
   const [selectedCard, setSelectedCard] = useState<CardData | null>(null);
   const [cards, setCards] = useState<CardData[]>([]);
@@ -89,6 +91,11 @@ const CardGallery: React.FC = () => {
   const filteredCards = activeTab === 'TODAS'
     ? cards
     : cards.filter(card => card.suit === activeTab.toLowerCase());
+
+  const handleCardClick = (card: CardData) => {
+    playSfx();
+    setSelectedCard(card);
+  };
 
   const handlePrev = useCallback(() => {
     if (!selectedCard) return;
@@ -152,7 +159,7 @@ const CardGallery: React.FC = () => {
       </header>
 
       {/* Navegación por pestañas (Filtros por palo) */}
-      <nav className="relative z-10 flex justify-center gap-2 mb-16 flex-wrap">
+      <nav className="relative z-10 flex justify-center gap-2 mb-6 flex-wrap">
         {['TODAS', 'ESPADAS', 'COPAS', 'OROS', 'BASTOS', 'JOKERS'].map((tab) => (
           <button
             key={tab}
@@ -176,10 +183,60 @@ const CardGallery: React.FC = () => {
         ))}
       </nav>
 
-      {/* Cuadrícula de Cartas (no-jokers) */}
+      {/* Descripción del filtro activo */}
+      <div className="relative z-10 max-w-7xl mx-auto px-2 md:px-0 mb-8">
+        {activeTab !== 'TODAS' && activeTab !== 'JOKERS' && (
+          <div className="flex items-center gap-4 px-4 py-3 border border-accent-gray/20 bg-surface/50 rounded-lg">
+            <div className="w-1 h-8 rounded-full shrink-0" style={{ backgroundColor: suitColors[activeTab.toLowerCase() as keyof typeof suitColors] }} />
+            {activeTab === 'ESPADAS' && (
+              <p className="text-xs md:text-sm text-muted italic">
+                Las <span className="text-[#ff4d4d] font-bold">Espadas</span> representan el poder y la guerra. 
+                Sus cartas se centran en el daño directo y el control del campo de batalla. 
+                <span className="text-white/40 ml-2">Sinergia: +1 de daño a todas tus cartas.</span>
+              </p>
+            )}
+            {activeTab === 'COPAS' && (
+              <p className="text-xs md:text-sm text-muted italic">
+                Las <span className="text-[#00ccff] font-bold">Copas</span> simbolizan la sanación y la magia. 
+                Sus cartas destacan por recuperar vida y purgar efectos negativos. 
+                <span className="text-white/40 ml-2">Sinergia: +1 HP por turno y purga.</span>
+              </p>
+            )}
+            {activeTab === 'OROS' && (
+              <p className="text-xs md:text-sm text-muted italic">
+                Los <span className="text-[#ffcc00] font-bold">Oros</span> encarnan la riqueza y la voluntad. 
+                Sus cartas generan recursos adicionales y roban voluntad al rival. 
+                <span className="text-white/40 ml-2">Sinergia: +1 de voluntad por turno.</span>
+              </p>
+            )}
+            {activeTab === 'BASTOS' && (
+              <p className="text-xs md:text-sm text-muted italic">
+                Los <span className="text-[#00ff66] font-bold">Bastos</span> son la defensa y la resistencia. 
+                Sus cartas protegen y reducen el daño recibido. 
+                <span className="text-white/40 ml-2">Sinergia: -1 de daño recibido a tus cartas.</span>
+              </p>
+            )}
+          </div>
+        )}
+        {activeTab === 'JOKERS' && (
+          <div className="flex items-center gap-4 px-4 py-3 border border-purple-900/30 bg-purple-950/20 rounded-lg">
+            <div className="w-1 h-8 rounded-full shrink-0 bg-[#a855f7]" />
+            <p className="text-xs md:text-sm text-muted italic">
+              Los <span className="text-[#a855f7] font-bold">Jokers</span> o comodines son cartas especiales 
+              que permiten realizar acciones únicas como intercambiar cartas, recuperar descartes o devolver 
+              cartas del tablero a la mano.
+            </p>
+          </div>
+        )}
+        {activeTab === 'TODAS' && filteredCards.length > 0 && (
+          <p className="text-xs text-muted/60 text-center">
+            Mostrando todas las {filteredCards.length} cartas de la baraja de Regnum Hollow.
+          </p>
+        )}
+      </div>
+
+      {/* Cuadrícula de Cartas */}
       <main className="relative z-10 max-w-7xl mx-auto px-2 md:px-0 pb-20 space-y-6">
-        
-        {/* Cartas normales: grid de 6 por fila */}
         {(() => {
           const normalCards = filteredCards.filter(c => c.suit !== 'jokers');
           const jokerCards  = filteredCards.filter(c => c.suit === 'jokers');
@@ -190,13 +247,12 @@ const CardGallery: React.FC = () => {
                 <div className="grid grid-cols-2 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-6">
                   <AnimatePresence mode='popLayout'>
                     {normalCards.map((card) => (
-                      <CardTile key={card.id} card={card} onClick={() => setSelectedCard(card)} />
+                      <CardTile key={card.id} card={card} onClick={() => handleCardClick(card)} />
                     ))}
                   </AnimatePresence>
                 </div>
               )}
 
-              {/* Jokers: fila flexible centrada */}
               {jokerCards.length > 0 && (
                 <div className="flex flex-wrap justify-center gap-3 md:gap-6">
                   <AnimatePresence mode='popLayout'>
@@ -205,7 +261,7 @@ const CardGallery: React.FC = () => {
                         key={card.id}
                         className="w-[calc((100%/2)-0.75rem)] xs:w-[calc((100%/2)-0.75rem)] sm:w-[calc((100%/3)-0.75rem)] md:w-[calc((100%/4)-1rem)] lg:w-[calc((100%/6)-1.25rem)]"
                       >
-                        <CardTile card={card} onClick={() => setSelectedCard(card)} />
+                        <CardTile card={card} onClick={() => handleCardClick(card)} />
                       </div>
                     ))}
                   </AnimatePresence>
@@ -233,7 +289,6 @@ const CardGallery: React.FC = () => {
               className="max-w-6xl w-full flex flex-col md:flex-row gap-8 md:gap-16 items-center md:items-start relative group/modal" 
               onClick={e => e.stopPropagation()}
             >
-              {/* Botones de Navegación Lateral (Escritorio) */}
               <button 
                 onClick={(e) => { e.stopPropagation(); handlePrev(); }}
                 className="absolute -left-12 lg:-left-20 top-1/2 -translate-y-1/2 p-4 text-muted hover:text-primary-gold transition-all hidden md:block group/btn"
@@ -248,7 +303,7 @@ const CardGallery: React.FC = () => {
                 <ChevronRight size={48} className="group-hover/btn:translate-x-1 transition-transform" />
               </button>
 
-              {/* Carta en Grande - Ajuste fino de escala (-10px adicionales) */}
+              {/* Carta en Grande */}
               <div className="w-full max-w-[235px] sm:max-w-[335px] md:max-w-[405px] lg:max-w-[465px] aspect-[2/3] relative shrink-0">
                 <div 
                   className="w-full h-full rounded-2xl md:rounded-[2.5rem] overflow-hidden shadow-2xl relative border-2 card-holographic"
@@ -283,6 +338,18 @@ const CardGallery: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Botón de sonido de la carta */}
+                <div className="flex items-center justify-center md:justify-start gap-4">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); playCardSfx(selectedCard, 0.3); }}
+                    className="flex items-center gap-2 px-4 py-2 bg-surface border border-accent-gray/30 rounded-lg text-primary-gold hover:bg-primary-gold hover:text-bg-main transition-all group"
+                    title="Reproducir sonido de la carta"
+                  >
+                    <Volume2 size={18} className="group-hover:scale-110 transition-transform" />
+                    <span className="text-[9px] uppercase tracking-widest font-bold">Sonido</span>
+                  </button>
+                </div>
 
                 <div className="relative">
                    <div className="absolute -left-6 top-0 bottom-0 w-1 bg-primary-gold/20 hidden md:block" />

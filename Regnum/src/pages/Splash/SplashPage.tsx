@@ -3,22 +3,23 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../../contexts/SettingsContext';
 
-const SPLASH_MUSIC_URL = 'https://res.cloudinary.com/drvgncidb/video/upload/Assets/Folders/Home/regnumhollow/splash2.mp3';
-
 const SplashPage: React.FC = () => {
   const navigate = useNavigate();
-  const { playMusic, stopMusic } = useSettings();
+  const { playSfxResource, stopMusic } = useSettings();
 
-  // Play splash music after 250ms delay
+  // Stop any lingering music and play splash sound after 250ms delay
   useEffect(() => {
+    stopMusic();
     const timer = setTimeout(() => {
-      playMusic(SPLASH_MUSIC_URL);
+      playSfxResource({
+        cloudinary: 'Assets/Folders/Home/regnumhollow/background/splash2.mp3',
+        local: '/audio/regnum/background/splash2.mp3',
+      });
     }, 250);
     return () => clearTimeout(timer);
-  }, [playMusic]);
+  }, [playSfxResource, stopMusic]);
 
   const handleStart = () => {
-    stopMusic();
     navigate('/login');
   };
 
@@ -31,13 +32,12 @@ const SplashPage: React.FC = () => {
       exit={{ opacity: 0 }}
       transition={{ duration: 1.5 }}
     >
-      {/* Background Image with Overlay */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center transition-transform duration-[10000ms] ease-out scale-110 hover:scale-100"
-        style={{ 
-          backgroundImage: `url('/splash_background.png')`,
-          filter: 'brightness(0.4) contrast(1.2)'
-        }}
+      {/* Background Image - object-cover fills the screen without distortion */}
+      <img 
+        src="/splash_background.png"
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-[10000ms] ease-out scale-110 hover:scale-100"
+        style={{ filter: 'brightness(0.4) contrast(1.2)' }}
       />
       
       {/* Vignette effect */}

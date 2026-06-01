@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
 import { type CardData } from '../../../utils/cardData';
+import { playSfxWithFallback } from '../../../utils/audioFallback';
+import { SFX_KEYS } from '../../../contexts/SettingsContext';
 
 interface AttackAnimationOverlayProps {
   attackerCard: CardData;
@@ -30,6 +32,35 @@ export const AttackAnimationOverlay: React.FC<AttackAnimationOverlayProps> = ({
       onComplete();
       return;
     }
+
+    // Reproducir SFX de ataque según el rol de la carta (con fallback local)
+    const role = attackerCard.role.toUpperCase();
+    const rank = attackerCard.rank;
+    const suit = attackerCard.suit;
+
+    // Mapa de sonidos según rol/tipo de ataque
+    const attackSoundMap: Record<string, { cloudinary: string; local: string }> = {
+      'AS': SFX_KEYS.ATTACK_FULTHIM,
+      'ASESINO': SFX_KEYS.ATTACK_SLASH,
+      'BESTIA': SFX_KEYS.ATTACK_4DOT,
+      'PERRO': SFX_KEYS.ATTACK_4DOT,
+      'JABALI': SFX_KEYS.ATTACK_4DOT,
+      'SERPIENTE': SFX_KEYS.ATTACK_4DOT,
+      'TORO': SFX_KEYS.ATTACK_4DOT,
+      'TANQUE': SFX_KEYS.ATTACK_BANISH,
+      'CLERIGO': SFX_KEYS.ATTACK_ORB,
+      'CURANDERO': SFX_KEYS.ATTACK_ORB,
+      'TIRADOR': SFX_KEYS.ATTACK_TAKE,
+      'PICARO': SFX_KEYS.ATTACK_SWAP,
+      'MAGO': SFX_KEYS.ATTACK_THUNDER,
+      'SOTA': SFX_KEYS.ATTACK_SLASH,
+      'CABALLO': SFX_KEYS.ATTACK_TAKE,
+      'REY': SFX_KEYS.ATTACK_FULTHIM,
+    };
+
+    // Elegir sonido según el rol; si es heal, usar orb
+    const sfxKey = isHeal ? SFX_KEYS.ATTACK_ORB : (attackSoundMap[role] || SFX_KEYS.ATTACK_SLASH);
+    playSfxWithFallback(sfxKey.cloudinary, sfxKey.local, 0.3).catch(() => {});
 
     const W = window.innerWidth;
     const H = window.innerHeight;

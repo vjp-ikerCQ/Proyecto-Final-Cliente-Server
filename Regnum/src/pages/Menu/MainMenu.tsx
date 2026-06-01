@@ -64,9 +64,9 @@ const MainMenu: React.FC<MainMenuProps> = ({ user }) => {
   
   const navigate = useNavigate();
 
-  // Reproducir música del menú al montar
+  // Reproducir música del menú al montar (con fallback Cloudinary ↔ Local)
   useEffect(() => {
-    playMusic(MUSIC_KEYS.MENU);
+    playMusic(MUSIC_KEYS.MENU.local);
   }, [playMusic]);
 
   const menuItems = [];

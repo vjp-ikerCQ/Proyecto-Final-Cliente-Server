@@ -17,6 +17,7 @@ import { AttackAnimationOverlay } from './components/AttackAnimationOverlay';
 import { JokerAnimationOverlay } from './components/JokerAnimationOverlay';
 
 import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
+import { playCardSfx } from '../../utils/cardAudioMap';
 import SurrenderTransition from '../../components/UI/SurrenderTransition';
 import SettingsModal from '../../components/Modal/SettingsModal';
 
@@ -46,7 +47,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      playMusic(MUSIC_KEYS.BATTLE);
+      playMusic(MUSIC_KEYS.BATTLE.local);
     }, 1000);
 
     return () => {
@@ -88,6 +89,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
     moveCaballo,
     healCardCopa,
   } = gameState;
+
 
   const { playerSynergy, opponentSynergy, getBonusForSynergy } = useSuitSynergy({
     playerBoard: board,
@@ -308,6 +310,11 @@ const Game: React.FC<GameProps> = ({ user }) => {
 
   const handlePlayCard = (slotIndex: number) => {
     if (selectedHandCardIndex === null) return;
+    const card = hand[selectedHandCardIndex];
+    // Reproducir el sonido específico de la carta según su palo y rango
+    if (card && card.suit !== 'jokers') {
+      playCardSfx(card, 0.3);
+    }
     playCard(true, slotIndex, selectedHandCardIndex);
     setSelectedHandCardIndex(null);
   };

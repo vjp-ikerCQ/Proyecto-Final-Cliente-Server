@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { motion, type Variants } from 'framer-motion';
-import { Crown, Skull, RotateCcw, Home, Trophy, Flame } from 'lucide-react';
+import { Crown, ShieldOff, RotateCcw, Home, Trophy, Flame } from 'lucide-react';
 import { useSettings } from '../../../contexts/SettingsContext';
+import { createAudioWithFallback } from '../../../utils/audioFallback';
 
 interface GameOverOverlayProps {
   result: 'victory' | 'defeat';
@@ -58,29 +59,44 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { settings } = useSettings();
 
-  // Play result audio on mount
+  // Play result audio on mount with Cloudinary fallback
   useEffect(() => {
     const volume = settings.sfxVolume ?? 0.5;
     if (result === 'victory') {
-      const victoryMusic = new Audio('https://res.cloudinary.com/drvgncidb/video/upload/Assets/Folders/Home/regnumhollow/winning-loop.mp3');
-      victoryMusic.volume = volume;
-      victoryMusic.loop = true;
-      victoryMusic.play().catch(() => {});
+      createAudioWithFallback(
+        'Assets/Folders/Home/regnumhollow/background/winning-loop.mp3',
+        '/audio/regnum/background/winning-loop.mp3',
+        volume,
+        true  // loop
+      );
     } else {
-      // Defeat SFX
-      const defeatSfx = new Audio('https://res.cloudinary.com/drvgncidb/video/upload/Assets/Folders/Home/regnumhollow/mixkit-circus-lose.wav');
-      defeatSfx.volume = volume;
-      defeatSfx.play().catch(() => {});
+      // Defeat SFX (local fallback)
+      createAudioWithFallback(
+        'Assets/Folders/Home/regnumhollow/background/mixkit-circus-lose.wav',
+        '/audio/regnum/background/mixkit-circus-lose.wav',
+        volume,
+        false
+      );
 
-      // Random narrator voice lines
+      // Random narrator voice lines (local fallback)
       const voices = [
-        'https://res.cloudinary.com/drvgncidb/video/upload/Assets/Folders/Home/regnumhollow/game_over.mp3',
-        'https://res.cloudinary.com/drvgncidb/video/upload/Assets/Folders/Home/regnumhollow/loser.mp3',
-        'https://res.cloudinary.com/drvgncidb/video/upload/Assets/Folders/Home/regnumhollow/you_lose.mp3',
+        {
+          cloudinary: 'Assets/Folders/Home/regnumhollow/background/battle_lost.mp3',
+          local: '/audio/regnum/background/battle_lost.mp3',
+        },
+        {
+          cloudinary: 'Assets/Folders/Home/regnumhollow/background/battle_lost.mp3',
+          local: '/audio/regnum/background/battle_lost.mp3',
+        },
+        {
+          cloudinary: 'Assets/Folders/Home/regnumhollow/background/battle_lost.mp3',
+          local: '/audio/regnum/background/battle_lost.mp3',
+        },
       ];
-      const voice = new Audio(voices[Math.floor(Math.random() * voices.length)]);
-      voice.volume = volume;
-      setTimeout(() => { voice.play().catch(() => {}); }, 800);
+      const voice = voices[Math.floor(Math.random() * voices.length)];
+      setTimeout(() => {
+        createAudioWithFallback(voice.cloudinary, voice.local, volume, false);
+      }, 800);
     }
   }, [result, settings.sfxVolume]);
 
@@ -400,9 +416,10 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
     },
   };
 
-  const skullBurnVariants: Variants = {
+  const brokenShieldVariants: Variants = {
     animate: {
       y: [0, -3, 0],
+      rotate: [0, -3, 3, -2, 0],
       filter: [
         'drop-shadow(0 0 8px rgba(220,38,38,0.5))',
         'drop-shadow(0 0 20px rgba(239,68,68,0.8))',
@@ -448,7 +465,7 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
           />
 
           <motion.div
-            variants={isVic ? crownSparkleVariants : skullBurnVariants}
+            variants={isVic ? crownSparkleVariants : brokenShieldVariants}
             animate="animate"
             className={`w-24 h-24 rounded-full flex items-center justify-center border-2 shadow-inner bg-gradient-to-b ${
               isVic
@@ -459,7 +476,7 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
             {isVic ? (
               <Crown className="w-12 h-12 text-[#ffcc00] filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]" />
             ) : (
-              <Skull className="w-12 h-12 text-red-500 filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]" />
+              <ShieldOff className="w-12 h-12 text-red-500 filter drop-shadow-[0_2px_4px_rgba(220,38,38,0.6)]" />
             )}
           </motion.div>
         </motion.div>
