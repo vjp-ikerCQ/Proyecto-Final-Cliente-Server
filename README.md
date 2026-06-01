@@ -149,7 +149,7 @@ Este proyecto ha sido realizado por:
 * **Pablo Serrano:** Desarrollo de la interfaz gráfica y Frontend.
 * **Antonio Pérez:** Desarrollo del Backend y API.
 * **Ismael Gil:** Modelos de Inteligencia Artificial para las ilustraciones de las cartas y apoyo general y supervisión en Frontend y Backend.
-* **Iker Clemente:** Diseño y desarrollo de los sonidos y música de la aplicación.
+* **Iker Clemente:** Diseño y desarrollo de los sonidos, música de la aplicación y gestión de la nube.
 
 ---
 
