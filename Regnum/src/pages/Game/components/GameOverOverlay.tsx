@@ -9,6 +9,8 @@ interface GameOverOverlayProps {
   userName: string;
   onRestart: () => void;
   onMainMenu: () => void;
+  /** Si es una rendición (derrota deshonrosa) */
+  dishonorable?: boolean;
 }
 
 interface Sparkle {
@@ -55,12 +57,15 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
   userName,
   onRestart,
   onMainMenu,
+  dishonorable = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { settings } = useSettings();
+  const { settings, stopMusic } = useSettings();
 
   // Play result audio on mount with Cloudinary fallback
   useEffect(() => {
+    // Stop battle music first
+    stopMusic();
     const volume = settings.sfxVolume ?? 0.5;
     if (result === 'victory') {
       createAudioWithFallback(
@@ -78,27 +83,29 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
         false
       );
 
-      // Random narrator voice lines (local fallback)
-      const voices = [
-        {
-          cloudinary: 'Assets/Folders/Home/regnumhollow/background/battle_lost.mp3',
-          local: '/audio/regnum/background/battle_lost.mp3',
-        },
-        {
-          cloudinary: 'Assets/Folders/Home/regnumhollow/background/battle_lost.mp3',
-          local: '/audio/regnum/background/battle_lost.mp3',
-        },
-        {
-          cloudinary: 'Assets/Folders/Home/regnumhollow/background/battle_lost.mp3',
-          local: '/audio/regnum/background/battle_lost.mp3',
-        },
-      ];
-      const voice = voices[Math.floor(Math.random() * voices.length)];
-      setTimeout(() => {
-        createAudioWithFallback(voice.cloudinary, voice.local, volume, false);
-      }, 800);
+      // Solo en derrota normal (no rendición), reproducir voz de narrador
+      if (!dishonorable) {
+        const voices = [
+          {
+            cloudinary: 'Assets/Folders/Home/regnumhollow/background/battle_lost.mp3',
+            local: '/audio/regnum/background/battle_lost.mp3',
+          },
+          {
+            cloudinary: 'Assets/Folders/Home/regnumhollow/background/battle_lost.mp3',
+            local: '/audio/regnum/background/battle_lost.mp3',
+          },
+          {
+            cloudinary: 'Assets/Folders/Home/regnumhollow/background/battle_lost.mp3',
+            local: '/audio/regnum/background/battle_lost.mp3',
+          },
+        ];
+        const voice = voices[Math.floor(Math.random() * voices.length)];
+        setTimeout(() => {
+          createAudioWithFallback(voice.cloudinary, voice.local, volume, false);
+        }, 800);
+      }
     }
-  }, [result, settings.sfxVolume]);
+  }, [result, settings.sfxVolume, stopMusic]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -443,7 +450,7 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className={`relative max-w-lg w-full z-20 p-8 md:p-12 rounded-3xl border text-center backdrop-blur-xl shadow-[0_0_80px_rgba(0,0,0,0.9)] overflow-hidden ${
+        className={`relative ${dishonorable ? 'max-w-2xl' : 'max-w-lg'} w-full z-20 p-8 md:p-12 rounded-3xl border text-center backdrop-blur-xl shadow-[0_0_80px_rgba(0,0,0,0.9)] overflow-hidden ${
           isVic
             ? 'bg-[#080d08]/75 border-primary-gold/45 shadow-[0_0_50px_rgba(166,138,100,0.15)]'
             : 'bg-[#0f0909]/75 border-red-950/45 shadow-[0_0_50px_rgba(220,38,38,0.1)]'
@@ -493,7 +500,7 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
             WebkitBackgroundClip: 'text',
           }}
         >
-          {isVic ? 'VICTORIA' : 'DERROTA'}
+          {isVic ? 'VICTORIA' : dishonorable ? 'RENDICIÓN DESHONROSA' : 'DERROTA'}
         </motion.h1>
 
         {/* Separador de línea con florón */}
@@ -515,7 +522,9 @@ export const GameOverOverlay: React.FC<GameOverOverlayProps> = ({
           <p className="text-gray-400 text-sm leading-relaxed font-spectral">
             {isVic
               ? 'Has demostrado una destreza táctica legendaria en el tablero. Tu nombre se cantará en las tabernas de todo Regnum por generaciones.'
-              : 'La implacable voluntad del enemigo ha prevalecido sobre tu ejército. Los estandartes se han quemado y la oscuridad acecha el trono.'}
+              : dishonorable
+                ? 'Tu cobardía ha manchado el honor de tu linaje. Los gritos de los tuyos resuenan en la oscuridad mientras el trono cae en manos del enemigo.'
+                : 'La implacable voluntad del enemigo ha prevalecido sobre tu ejército. Los estandartes se han quemado y la oscuridad acecha el trono.'}
           </p>
         </motion.div>
 

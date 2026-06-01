@@ -1,25 +1,43 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../../contexts/SettingsContext';
+import { createAudioWithFallback } from '../../utils/audioFallback';
 
 const SplashPage: React.FC = () => {
   const navigate = useNavigate();
-  const { playSfxResource, stopMusic } = useSettings();
+  const { stopMusic } = useSettings();
+  const splashAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Stop any lingering music and play splash sound after 250ms delay
   useEffect(() => {
     stopMusic();
     const timer = setTimeout(() => {
-      playSfxResource({
-        cloudinary: 'Assets/Folders/Home/regnumhollow/background/splash2.mp3',
-        local: '/audio/regnum/background/splash2.mp3',
-      });
+      splashAudioRef.current = createAudioWithFallback(
+        'Assets/Folders/Home/regnumhollow/background/splash2.mp3',
+        '/audio/regnum/background/splash2.mp3',
+        0.5,
+        false
+      );
     }, 250);
-    return () => clearTimeout(timer);
-  }, [playSfxResource, stopMusic]);
+    return () => {
+      clearTimeout(timer);
+      // Stop splash audio when leaving the page
+      if (splashAudioRef.current) {
+        splashAudioRef.current.pause();
+        splashAudioRef.current.currentTime = 0;
+        splashAudioRef.current = null;
+      }
+    };
+  }, [stopMusic]);
 
   const handleStart = () => {
+    // Stop splash audio before navigating
+    if (splashAudioRef.current) {
+      splashAudioRef.current.pause();
+      splashAudioRef.current.currentTime = 0;
+      splashAudioRef.current = null;
+    }
     navigate('/login');
   };
 

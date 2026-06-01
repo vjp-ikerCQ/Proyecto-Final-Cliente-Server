@@ -16,9 +16,9 @@ import { CombatLogOverlay } from './components/CombatLogOverlay';
 import { AttackAnimationOverlay } from './components/AttackAnimationOverlay';
 import { JokerAnimationOverlay } from './components/JokerAnimationOverlay';
 
-import { useSettings, MUSIC_KEYS } from '../../contexts/SettingsContext';
+import { useSettings, MUSIC_KEYS, SFX_KEYS } from '../../contexts/SettingsContext';
 import { playCardSfx } from '../../utils/cardAudioMap';
-import SurrenderTransition from '../../components/UI/SurrenderTransition';
+import { playSfxWithFallback } from '../../utils/audioFallback';
 import SettingsModal from '../../components/Modal/SettingsModal';
 
 const MAX_HP = 30;
@@ -42,19 +42,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const difficulty = location.state?.difficulty || 'hard'; // Por defecto hard para compatibilidad
-  const { playMusic, stopMusic } = useSettings();
-  const [isSurrendering, setIsSurrendering] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      playMusic(MUSIC_KEYS.BATTLE.local);
-    }, 1000);
-
-    return () => {
-      clearTimeout(timer);
-      stopMusic();
-    };
-  }, [playMusic, stopMusic]);
+  const { playMusic, stopMusic, settings } = useSettings();
 
   // Custom Hooks para estado y bot
   const gameState = useGameState();
@@ -105,6 +93,28 @@ const Game: React.FC<GameProps> = ({ user }) => {
     }
   }, [playerSynergy.isActive, playerSynergy.suit]);
 
+  const prevLoadingRef = useRef(true);
+
+  // Reproducir música y sonido de espadas cuando la carga termina
+  useEffect(() => {
+    if (prevLoadingRef.current && !isLoading) {
+      // Loading acaba de terminar → iniciar música y sonido de espadas
+      playMusic(MUSIC_KEYS.BATTLE.local);
+      playSfxWithFallback(
+        SFX_KEYS.SWORD_CLASH.cloudinary,
+        SFX_KEYS.SWORD_CLASH.local,
+        settings.sfxVolume ?? 0.5
+      ).catch(() => {});
+    }
+    prevLoadingRef.current = isLoading;
+  }, [isLoading, playMusic, settings.sfxVolume]);
+
+  useEffect(() => {
+    return () => {
+      stopMusic();
+    };
+  }, [stopMusic]);
+
   useEffect(() => {
     if (opponentSynergy.isActive && opponentSynergy.suit) {
       const bonus = getBonusForSynergy(opponentSynergy);
@@ -130,6 +140,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
   const [draggingHandIndex, setDraggingHandIndex] = useState<number | null>(null);
   const [isDragOverDiscard, setIsDragOverDiscard] = useState(false);
   const [gameOver, setGameOver] = useState<'victory' | 'defeat' | null>(null);
+  const [isDishonorable, setIsDishonorable] = useState(false);
   const statsUpdated = useRef(false);
 
   // Estado del popup del As de Copas
@@ -451,8 +462,11 @@ const Game: React.FC<GameProps> = ({ user }) => {
     setSelectedAttackerIndex(null);
     setViewingCard(null);
     setGameOver(null);
+    setIsDishonorable(false);
     statsUpdated.current = false;
     setJokerAnim(null);
+    // Reiniciar música de batalla
+    playMusic(MUSIC_KEYS.BATTLE.local);
     setJoker2Phase(null);
     setJoker2BoardSlot(null);
     setJoker1Phase(null);
@@ -1435,6 +1449,7 @@ const Game: React.FC<GameProps> = ({ user }) => {
             userName={user.name || 'Héroe'}
             onRestart={handleRestart}
             onMainMenu={() => navigate('/menu')}
+            dishonorable={isDishonorable}
           />
         )}
       </AnimatePresence>
@@ -1477,7 +1492,8 @@ const Game: React.FC<GameProps> = ({ user }) => {
                       updateMatchStats(user.name, 'lose');
                     }
                     setShowSurrenderModal(false);
-                    setIsSurrendering(true);
+                    setGameOver('defeat');
+                    setIsDishonorable(true);
                   }}
                   className="flex-1 py-3 px-6 bg-red-600 text-white rounded-lg uppercase tracking-widest text-xs font-black hover:bg-red-500 shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all"
                 >
@@ -1489,11 +1505,6 @@ const Game: React.FC<GameProps> = ({ user }) => {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {isSurrendering && (
-          <SurrenderTransition onComplete={() => navigate('/menu')} />
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {isSettingsOpen && (
